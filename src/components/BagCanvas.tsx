@@ -5,12 +5,14 @@ import { intersects } from '../utils/collision';
 import { isInside } from '../utils/geometry';
 
 export const BagCanvas: React.FC = () => {
-  const { bag, placements, products, updatePlacement, mode } = useBagStore();
+  const { bag, placements, products, updatePlacement, mode, removeProductInstance } = useBagStore();
   const svgRef = React.useRef<SVGSVGElement | null>(null);
 
   const [draggedId, setDraggedId] = React.useState<string | null>(null);
   const [dragOffset, setDragOffset] = React.useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [tempPos, setTempPos] = React.useState<{ xCm: number; yCm: number } | null>(null);
+  const [selectedId, setSelectedId] = React.useState<string | null>(null);
+  const [hoveredId, setHoveredId] = React.useState<string | null>(null);
 
   if (!bag) {
     return (
@@ -33,6 +35,7 @@ export const BagCanvas: React.FC = () => {
   };
 
   const handleMouseDown = (e: React.MouseEvent<SVGElement>, plId: string) => {
+    setSelectedId(plId);
     if (mode !== 'manual') return;
     e.preventDefault();
     const placement = placements.find(p => p.id === plId);
@@ -189,6 +192,12 @@ export const BagCanvas: React.FC = () => {
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
+          onMouseDown={(e) => {
+            // Click on the empty space of SVG canvas clears the selection
+            if (e.target === svgRef.current) {
+              setSelectedId(null);
+            }
+          }}
           style={{ display: 'block', maxWidth: '100%', height: 'auto' }}
         >
           {/* 1. Bag Base Image */}
@@ -278,12 +287,20 @@ export const BagCanvas: React.FC = () => {
                     }
                   }
                   strokeColor = (inside && !overlaps) ? '#4CAF50' : '#f44336';
+                } else if (pl.id === selectedId) {
+                  strokeColor = '#007af5'; // Blue outline for active selection
                 }
+
+                const isSelected = pl.id === selectedId;
+                const isHovered = pl.id === hoveredId;
+                const showCancelButton = isSelected || isHovered;
 
                 return (
                   <g 
                     key={pl.id}
                     onMouseDown={(e) => handleMouseDown(e, pl.id)}
+                    onMouseEnter={() => setHoveredId(pl.id)}
+                    onMouseLeave={() => setHoveredId(null)}
                     onDoubleClick={() => handleDoubleClick(pl.id)}
                     style={{ cursor: mode === 'manual' ? 'move' : 'default' }}
                   >
@@ -303,8 +320,34 @@ export const BagCanvas: React.FC = () => {
                       height={height} 
                       fill="none" 
                       stroke={strokeColor} 
-                      strokeWidth="2"
+                      strokeWidth={isSelected ? "3" : "2"}
                     />
+                    {showCancelButton && (
+                      <g
+                        transform={`translate(${x + width - 14}, ${y + 14})`}
+                        onMouseDown={(e) => {
+                          e.stopPropagation(); // Stop dragging on cancel click
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation(); // Prevent selections
+                          removeProductInstance(pl.id);
+                        }}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <circle 
+                          r="12" 
+                          fill="rgba(50, 40, 40, 0.85)" 
+                          stroke="white" 
+                          strokeWidth="1.5" 
+                        />
+                        <path 
+                          d="M -3.5 -3.5 L 3.5 3.5 M -3.5 3.5 L 3.5 -3.5" 
+                          stroke="white" 
+                          strokeWidth="2" 
+                          strokeLinecap="round" 
+                        />
+                      </g>
+                    )}
                   </g>
                 );
               })}
