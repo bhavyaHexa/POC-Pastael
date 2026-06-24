@@ -38,7 +38,7 @@ export const ProductList: React.FC = () => {
             transition: "background 0.2s",
           }}
         >
-          Add Packing Cube (Pair)
+          Packing Cube (Small)
         </button>
       </div>
 

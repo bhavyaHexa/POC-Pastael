@@ -54,7 +54,7 @@ const DEFAULT_BAGS: BagTemplate[] = [
 const DEFAULT_PRODUCTS: Pocket[] = [
   {
     id: "pouch-large",
-    name: "Large Pouch",
+    name: "S",
     imageUrl: "/images/BigPouch.svg",
     widthCm: 20.9,
     heightCm: 26.0,
@@ -62,7 +62,7 @@ const DEFAULT_PRODUCTS: Pocket[] = [
   },
   {
     id: "pouch-small",
-    name: "Small Pouch",
+    name: "XS",
     imageUrl: "/images/SmallPouch.svg",
     widthCm: 10.9,
     heightCm: 24.9,

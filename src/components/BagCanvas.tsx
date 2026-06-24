@@ -1,251 +1,550 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
+import { Canvas, FabricImage, Rect, Control, FabricObject, controlsUtils } from 'fabric';
 import { useBagStore } from '../store/bagStore';
 import { cmToPx, pxToCm } from '../utils/scaling';
 import { intersects } from '../utils/collision';
 import { isInside } from '../utils/geometry';
 
-export const BagCanvas: React.FC = () => {
-  const { bag, placements, products, updatePlacement, mode, removeProductInstance } = useBagStore();
-  const svgRef = React.useRef<SVGSVGElement | null>(null);
-
-  const [draggedId, setDraggedId] = React.useState<string | null>(null);
-  const [dragOffset, setDragOffset] = React.useState<{ x: number; y: number }>({ x: 0, y: 0 });
-  const [tempPos, setTempPos] = React.useState<{ xCm: number; yCm: number } | null>(null);
-  const [selectedId, setSelectedId] = React.useState<string | null>(null);
-  const [hoveredId, setHoveredId] = React.useState<string | null>(null);
-
-  // Rotate States
-  const [rotatingId, setRotatingId] = React.useState<string | null>(null);
-  const [startAngle, setStartAngle] = React.useState<number>(0);
-  const [startRotation, setStartRotation] = React.useState<number>(0);
-  const [tempRotation, setTempRotation] = React.useState<number | null>(null);
-  const [hasMoved, setHasMoved] = React.useState<boolean>(false);
-
-  if (!bag) {
-    return (
-      <div style={{ padding: '20px', textAlign: 'center' }}>
-        <h3>No bag selected</h3>
-      </div>
-    );
-  }
-
-  // Convert bag dimensions from cm to px
-  const svgWidth = cmToPx(bag.widthCm);
-  const svgHeight = cmToPx(bag.heightCm);
-
-  const getSvgCoords = (clientX: number, clientY: number) => {
-    if (!svgRef.current) return { x: 0, y: 0 };
-    const rect = svgRef.current.getBoundingClientRect();
-    const svgX = ((clientX - rect.left) / rect.width) * svgWidth;
-    const svgY = ((clientY - rect.top) / rect.height) * svgHeight;
-    return { x: svgX, y: svgY };
+interface CustomFabricObject extends FabricObject {
+  data?: {
+    type: 'pouch' | 'packingArea' | 'bagBackground';
+    id?: string;
+    productId?: string;
   };
+}
 
-  const handleMouseDown = (e: React.MouseEvent<SVGElement>, plId: string) => {
-    setSelectedId(plId);
-    if (mode !== 'manual') return;
-    e.preventDefault();
-    const placement = placements.find(p => p.id === plId);
-    if (!placement) return;
-
-    const coords = getSvgCoords(e.clientX, e.clientY);
-    const itemXPx = cmToPx(placement.xCm);
-    const itemYPx = cmToPx(placement.yCm);
-
-    setDraggedId(plId);
-    setDragOffset({ x: coords.x - itemXPx, y: coords.y - itemYPx });
-    setTempPos({ xCm: placement.xCm, yCm: placement.yCm });
-  };
-
-  const handleRotateMouseDown = (e: React.MouseEvent<SVGElement>, plId: string) => {
-    e.stopPropagation();
-    e.preventDefault();
-    const placement = placements.find(p => p.id === plId);
-    if (!placement) return;
-
-    const cx = cmToPx(placement.xCm) + cmToPx(placement.widthCm) / 2;
-    const cy = cmToPx(placement.yCm) + cmToPx(placement.heightCm) / 2;
-
-    const coords = getSvgCoords(e.clientX, e.clientY);
-    const initialAngle = Math.atan2(coords.y - cy, coords.x - cx) * 180 / Math.PI;
-
-    setRotatingId(plId);
-    setStartAngle(initialAngle);
-    setStartRotation(placement.rotation);
-    setTempRotation(placement.rotation);
-    setHasMoved(false);
-  };
-
-  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
-    if (mode !== 'manual') return;
-
-    if (draggedId && tempPos !== null) {
-      const placement = placements.find(p => p.id === draggedId);
-      if (!placement) return;
-
-      const coords = getSvgCoords(e.clientX, e.clientY);
-      const proposedXPx = coords.x - dragOffset.x;
-      const proposedYPx = coords.y - dragOffset.y;
-
-      const newXCm = pxToCm(proposedXPx);
-      const newYCm = pxToCm(proposedYPx);
-
-      setTempPos({ 
-        xCm: Number(newXCm.toFixed(2)), 
-        yCm: Number(newYCm.toFixed(2)) 
-      });
-    } else if (rotatingId && tempRotation !== null) {
-      const placement = placements.find(p => p.id === rotatingId);
-      if (!placement) return;
-
-      const cx = cmToPx(placement.xCm) + cmToPx(placement.widthCm) / 2;
-      const cy = cmToPx(placement.yCm) + cmToPx(placement.heightCm) / 2;
-
-      const coords = getSvgCoords(e.clientX, e.clientY);
-      const currentAngle = Math.atan2(coords.y - cy, coords.x - cx) * 180 / Math.PI;
-
-      let diff = currentAngle - startAngle;
-      let newRot = (startRotation + diff) % 360;
-      if (newRot < 0) newRot += 360;
-
-      setTempRotation(newRot);
-      setHasMoved(true);
+// Define custom delete control outside the component
+const deleteControl = new Control({
+  x: 0.5,
+  y: -0.5,
+  offsetX: 12,
+  offsetY: -12,
+  cursorStyle: 'pointer',
+  mouseUpHandler: (eventData, transformData) => {
+    void eventData;
+    const target = transformData.target;
+    const targetData = target ? (target as CustomFabricObject).data : null;
+    if (targetData && targetData.id) {
+      useBagStore.getState().removeProductInstance(targetData.id);
     }
-  };
+    return true;
+  },
+  render: (ctx, left, top) => {
+    ctx.save();
+    ctx.translate(left, top);
+    
+    // Draw background circle
+    ctx.beginPath();
+    ctx.arc(0, 0, 10, 0, 2 * Math.PI);
+    ctx.fillStyle = 'rgba(50, 40, 40, 0.85)';
+    ctx.fill();
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
 
-  const handleMouseUp = () => {
-    if (mode !== 'manual') return;
+    // Draw X
+    ctx.beginPath();
+    ctx.moveTo(-4, -4);
+    ctx.lineTo(4, 4);
+    ctx.moveTo(-4, 4);
+    ctx.lineTo(4, -4);
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 2;
+    ctx.stroke();
 
-    if (draggedId && tempPos) {
-      const placement = placements.find(p => p.id === draggedId);
-      if (!placement) {
-        setDraggedId(null);
-        setTempPos(null);
-        return;
-      }
+    ctx.restore();
+  }
+});
 
-      const proposedRect = {
-        x: tempPos.xCm,
-        y: tempPos.yCm,
-        width: placement.widthCm,
-        height: placement.heightCm
-      };
-
-      let insideBin = false;
-      for (const bin of bag.packingAreasCm) {
-        if (isInside(proposedRect, bin)) {
-          insideBin = true;
-          break;
-        }
-      }
-
-      let overlaps = false;
-      if (insideBin) {
-        for (const pl of placements) {
-          if (pl.id === draggedId || !pl.fitted) continue;
-          const otherRect = {
-            x: pl.xCm,
-            y: pl.yCm,
-            width: pl.widthCm,
-            height: pl.heightCm
-          };
-          if (intersects(proposedRect, otherRect)) {
-            overlaps = true;
-            break;
-          }
-        }
-      }
-
-      if (insideBin && !overlaps) {
-        updatePlacement(draggedId, {
-          xCm: tempPos.xCm,
-          yCm: tempPos.yCm
-        });
-      } else {
-        console.log("Invalid placement (overlaps or outside compartment). Reverting position.");
-      }
-
-      setDraggedId(null);
-      setTempPos(null);
-    } else if (rotatingId) {
-      const placement = placements.find(p => p.id === rotatingId);
-      if (!placement) {
-        setRotatingId(null);
-        setTempRotation(null);
-        return;
-      }
-
-      // Snapping: if click, toggle directly. If drag, snap to nearest 0 or 90 based on 45 threshold.
-      let snapped: 0 | 90 = 0;
-      if (!hasMoved) {
-        snapped = placement.rotation === 0 ? 90 : 0;
-      } else {
-        const normalized = (tempRotation || 0) % 180;
-        if (normalized > 45 && normalized < 135) {
-          snapped = 90;
-        } else {
-          snapped = 0;
-        }
-      }
-
-      const instance = useBagStore.getState().pocketInstances.find(i => i.id === rotatingId);
-      const product = instance ? products.find(p => p.id === instance.pocketId) : null;
+// Define custom rotate control
+const rotateControl = new Control({
+  x: -0.5,
+  y: -0.5,
+  offsetX: -12,
+  offsetY: -12,
+  cursorStyle: 'alias',
+  actionName: 'rotate',
+  actionHandler: controlsUtils.rotationWithSnapping,
+  mouseUpHandler: (eventData, transformData) => {
+    void eventData;
+    const target = transformData.target;
+    const targetData = target ? (target as CustomFabricObject).data : null;
+    if (target && targetData && targetData.id) {
+      const currentAngle = target.angle || 0;
+      // Toggle rotation between 0 and 90
+      const snapped = (currentAngle % 180 === 90 || currentAngle % 180 === -90) ? 0 : 90;
+      
+      const storeState = useBagStore.getState();
+      const instance = storeState.pocketInstances.find((i) => i.id === targetData.id);
+      const product = instance ? storeState.products.find((p) => p.id === instance.pocketId) : null;
       if (product) {
         const newWidthCm = snapped === 90 ? product.heightCm : product.widthCm;
         const newHeightCm = snapped === 90 ? product.widthCm : product.heightCm;
+        
+        storeState.updatePlacement(targetData.id, {
+          rotation: snapped as 0 | 90,
+          widthCm: newWidthCm,
+          heightCm: newHeightCm
+        });
+        
+        target.set({
+          angle: snapped,
+        });
+        target.setCoords();
+        target.canvas?.renderAll();
+      }
+    }
+    return true;
+  },
+  render: (ctx, left, top) => {
+    ctx.save();
+    ctx.translate(left, top);
+    
+    // Draw background circle
+    ctx.beginPath();
+    ctx.arc(0, 0, 10, 0, 2 * Math.PI);
+    ctx.fillStyle = 'rgba(40, 40, 50, 0.85)';
+    ctx.fill();
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
 
-        const proposedRect = {
-          x: placement.xCm,
-          y: placement.yCm,
-          width: newWidthCm,
-          height: newHeightCm
+    // Draw rotation curved arrow
+    ctx.beginPath();
+    ctx.arc(-1, 1, 4, -Math.PI / 2, Math.PI, false);
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    
+    // Draw arrowhead
+    ctx.beginPath();
+    ctx.moveTo(-5, -3);
+    ctx.lineTo(-1, -2);
+    ctx.lineTo(-3, 2);
+    ctx.closePath();
+    ctx.fillStyle = 'white';
+    ctx.fill();
+
+    ctx.restore();
+  }
+});
+
+export const BagCanvas: React.FC = () => {
+  const { 
+    bag, 
+    placements, 
+    products, 
+    pocketInstances, 
+    updatePlacement, 
+    mode, 
+    removeProductInstance 
+  } = useBagStore();
+
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const fabricCanvasRef = useRef<Canvas | null>(null);
+
+  // Use a ref to access the latest state in Fabric.js event handlers without stale closures
+  const stateRef = useRef({
+    placements,
+    bag,
+    products,
+    pocketInstances,
+    mode,
+    updatePlacement,
+    removeProductInstance
+  });
+
+  useEffect(() => {
+    stateRef.current = {
+      placements,
+      bag,
+      products,
+      pocketInstances,
+      mode,
+      updatePlacement,
+      removeProductInstance
+    };
+  }, [placements, bag, products, pocketInstances, mode, updatePlacement, removeProductInstance]);
+
+  // Helper to validate a pouch's placement (inside compartments and no overlaps)
+  const validatePlacement = (obj: FabricObject) => {
+    const { 
+      bag: currentBag, 
+      placements: currentPlacements, 
+      products: currentProducts, 
+      pocketInstances: currentInstances 
+    } = stateRef.current;
+    
+    const objData = (obj as CustomFabricObject).data;
+    if (!currentBag || !objData?.id) return { isValid: false, xCm: 0, yCm: 0, rotation: 0 };
+
+    const angle = obj.angle || 0;
+    // Snap rotation: snap to 90 degrees if close, otherwise 0
+    const snappedRotation = (angle % 180 === 90 || angle % 180 === -90 || Math.abs(angle % 180) >= 135) ? 90 : 0;
+    
+    const instance = currentInstances.find(i => i.id === objData.id);
+    const product = instance ? currentProducts.find(p => p.id === instance.pocketId) : null;
+    if (!product) return { isValid: false, xCm: 0, yCm: 0, rotation: 0 };
+
+    const newWidthCm = snappedRotation === 90 ? product.heightCm : product.widthCm;
+    const newHeightCm = snappedRotation === 90 ? product.widthCm : product.heightCm;
+
+    const cx = obj.left!;
+    const cy = obj.top!;
+
+    const proposedWidthPx = cmToPx(newWidthCm);
+    const proposedHeightPx = cmToPx(newHeightCm);
+
+    const proposedXPx = cx - proposedWidthPx / 2;
+    const proposedYPx = cy - proposedHeightPx / 2;
+
+    const newXCm = pxToCm(proposedXPx);
+    const newYCm = pxToCm(proposedYPx);
+
+    const proposedRect = {
+      x: Number(newXCm.toFixed(2)),
+      y: Number(newYCm.toFixed(2)),
+      width: newWidthCm,
+      height: newHeightCm
+    };
+
+    // 1. Check inside container/compartments
+    let insideBin = false;
+    for (const bin of currentBag.packingAreasCm) {
+      if (isInside(proposedRect, bin)) {
+        insideBin = true;
+        break;
+      }
+    }
+
+    // 2. Check overlap with other fitted placements
+    let overlaps = false;
+    if (insideBin) {
+      for (const pl of currentPlacements) {
+        if (pl.id === objData.id || !pl.fitted) continue;
+        const otherRect = {
+          x: pl.xCm,
+          y: pl.yCm,
+          width: pl.widthCm,
+          height: pl.heightCm
         };
-
-        let insideBin = false;
-        for (const bin of bag.packingAreasCm) {
-          if (isInside(proposedRect, bin)) {
-            insideBin = true;
-            break;
-          }
-        }
-
-        let overlaps = false;
-        if (insideBin) {
-          for (const pl of placements) {
-            if (pl.id === rotatingId || !pl.fitted) continue;
-            const otherRect = {
-              x: pl.xCm,
-              y: pl.yCm,
-              width: pl.widthCm,
-              height: pl.heightCm
-            };
-            if (intersects(proposedRect, otherRect)) {
-              overlaps = true;
-              break;
-            }
-          }
-        }
-
-        if (insideBin && !overlaps) {
-          updatePlacement(rotatingId, {
-            rotation: snapped,
-            widthCm: newWidthCm,
-            heightCm: newHeightCm
-          });
-        } else {
-          console.log("Cannot rotate: would overlap or overflow compartment boundaries.");
+        if (intersects(proposedRect, otherRect)) {
+          overlaps = true;
+          break;
         }
       }
-
-      setRotatingId(null);
-      setTempRotation(null);
-      setHasMoved(false);
     }
+
+    return {
+      isValid: insideBin && !overlaps,
+      xCm: proposedRect.x,
+      yCm: proposedRect.y,
+      rotation: snappedRotation
+    };
   };
+
+  // Effect 1: Initialize canvas
+  useEffect(() => {
+    if (!canvasRef.current) return;
+
+    const initialBag = stateRef.current.bag;
+    const initialMode = stateRef.current.mode;
+    if (!initialBag) return;
+
+    const canvas = new Canvas(canvasRef.current, {
+      width: cmToPx(initialBag.widthCm),
+      height: cmToPx(initialBag.heightCm),
+      backgroundColor: '#f0f0f0',
+      selection: initialMode === 'manual',
+      enableRetinaScaling: false,
+    });
+
+    fabricCanvasRef.current = canvas;
+
+    // Register event listeners
+    canvas.on('object:moving', (e) => {
+      const obj = e.target;
+      if (!obj || (obj as CustomFabricObject).data?.type !== 'pouch') return;
+
+      const { isValid } = validatePlacement(obj);
+      const color = isValid ? '#4CAF50' : '#f44336';
+      obj.borderColor = color;
+      obj.cornerColor = color;
+      canvas.requestRenderAll();
+    });
+
+    canvas.on('object:rotating', (e) => {
+      const obj = e.target;
+      if (!obj || (obj as CustomFabricObject).data?.type !== 'pouch') return;
+
+      const { isValid } = validatePlacement(obj);
+      const color = isValid ? '#4CAF50' : '#f44336';
+      obj.borderColor = color;
+      obj.cornerColor = color;
+      canvas.requestRenderAll();
+    });
+
+    canvas.on('object:modified', (e) => {
+      const obj = e.target;
+      const objData = obj ? (obj as CustomFabricObject).data : null;
+      if (!obj || objData?.type !== 'pouch' || !objData.id) return;
+
+      const { isValid, xCm, yCm, rotation } = validatePlacement(obj);
+      const { placements: currentPlacements, updatePlacement: performUpdate } = stateRef.current;
+
+      const placement = currentPlacements.find(p => p.id === objData.id);
+
+      if (isValid && placement) {
+        const instance = stateRef.current.pocketInstances.find(i => i.id === objData.id);
+        const product = instance ? stateRef.current.products.find(p => p.id === instance.pocketId) : null;
+        
+        const newWidthCm = rotation === 90 ? product!.heightCm : product!.widthCm;
+        const newHeightCm = rotation === 90 ? product!.widthCm : product!.heightCm;
+
+        performUpdate(objData.id, {
+          xCm,
+          yCm,
+          rotation: rotation as 0 | 90,
+          widthCm: newWidthCm,
+          heightCm: newHeightCm
+        });
+
+        // Reset outline selection style to blue
+        obj.borderColor = '#007af5';
+        obj.cornerColor = '#007af5';
+      } else if (placement) {
+        // Revert to store position
+        const cx = cmToPx(placement.xCm) + cmToPx(placement.widthCm) / 2;
+        const cy = cmToPx(placement.yCm) + cmToPx(placement.heightCm) / 2;
+
+        obj.set({
+          left: cx,
+          top: cy,
+          angle: placement.rotation,
+        });
+        obj.setCoords();
+
+        obj.borderColor = '#007af5';
+        obj.cornerColor = '#007af5';
+        
+        console.log("Invalid placement: Reverted pouch position.");
+      }
+
+      canvas.requestRenderAll();
+    });
+
+    // Keyboard event listener for deleting selected pouch
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (stateRef.current.mode === 'manual' && (event.key === 'Delete' || event.key === 'Backspace')) {
+        const activeObject = canvas.getActiveObject();
+        if (activeObject && (activeObject as CustomFabricObject).data?.type === 'pouch') {
+          const objId = (activeObject as CustomFabricObject).data?.id;
+          if (objId) {
+            stateRef.current.removeProductInstance(objId);
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      canvas.dispose();
+      fabricCanvasRef.current = null;
+    };
+  }, []);
+
+  // Effect 2: Update canvas dimensions, background image, and packing area guides when bag changes
+  useEffect(() => {
+    const canvas = fabricCanvasRef.current;
+    if (!canvas || !bag) return;
+
+    const currentWidth = cmToPx(bag.widthCm);
+    const currentHeight = cmToPx(bag.heightCm);
+
+    canvas.setDimensions({ width: currentWidth, height: currentHeight });
+
+    // Clear existing background image object if it exists
+    const existingBg = canvas.getObjects().find(obj => (obj as CustomFabricObject).data?.type === 'bagBackground');
+    if (existingBg) {
+      canvas.remove(existingBg);
+    }
+
+    // Load background image as a standard non-selectable canvas object starting at top-left
+    FabricImage.fromURL(bag.imageUrl)
+      .then((img) => {
+        if (!fabricCanvasRef.current) return;
+        
+        img.set({
+          left: 0,
+          top: 0,
+          originX: 'left',
+          originY: 'top',
+          scaleX: currentWidth / img.width!,
+          scaleY: currentHeight / img.height!,
+          selectable: false,
+          evented: false,
+          hoverCursor: 'default',
+          data: { type: 'bagBackground' }
+        });
+        
+        canvas.add(img);
+        canvas.sendObjectToBack(img);
+        canvas.renderAll();
+      })
+      .catch((err) => console.error("Error loading bag background image:", err));
+
+    // Clear existing packing area rects
+    const existingRects = canvas.getObjects().filter(obj => (obj as CustomFabricObject).data?.type === 'packingArea');
+    existingRects.forEach(obj => canvas.remove(obj));
+
+    // Draw packing areas
+    bag.packingAreasCm.forEach((area) => {
+      const rect = new Rect({
+        left: cmToPx(area.x),
+        top: cmToPx(area.y),
+        width: cmToPx(area.width),
+        height: cmToPx(area.height),
+        originX: 'left',
+        originY: 'top',
+        fill: 'transparent',
+        stroke: 'red',
+        strokeDashArray: [4, 4],
+        strokeWidth: 2,
+        selectable: false,
+        evented: false,
+        data: { type: 'packingArea' },
+      });
+      canvas.add(rect);
+    });
+
+    canvas.renderAll();
+  }, [bag]);
+
+  // Effect 3: Synchronize placements layer (fitted pouches)
+  useEffect(() => {
+    const canvas = fabricCanvasRef.current;
+    if (!canvas || !bag) return;
+
+    canvas.selection = mode === 'manual';
+
+    const fittedPlacements = placements.filter(p => p.fitted);
+    const placementIds = fittedPlacements.map(p => p.id);
+
+    // Remove pouch objects no longer in the placements list
+    const existingPouches = canvas.getObjects().filter(obj => (obj as CustomFabricObject).data?.type === 'pouch');
+    existingPouches.forEach((obj) => {
+      const objId = (obj as CustomFabricObject).data?.id;
+      if (objId && !placementIds.includes(objId)) {
+        canvas.remove(obj);
+      }
+    });
+
+    // Update coordinates or add new ones
+    fittedPlacements.forEach((pl) => {
+      const existingObj = existingPouches.find(obj => (obj as CustomFabricObject).data?.id === pl.id);
+
+      const instance = pocketInstances.find(i => i.id === pl.id);
+      const product = instance ? products.find(p => p.id === instance.pocketId) : null;
+      if (!product) return;
+
+      const cx = cmToPx(pl.xCm) + cmToPx(pl.widthCm) / 2;
+      const cy = cmToPx(pl.yCm) + cmToPx(pl.heightCm) / 2;
+
+      if (existingObj) {
+        // If not actively being dragged/modified by the user, synchronize its coordinates
+        if (canvas.getActiveObject() !== existingObj) {
+          existingObj.set({
+            left: cx,
+            top: cy,
+            angle: pl.rotation,
+          });
+
+          existingObj.selectable = mode === 'manual';
+          existingObj.evented = mode === 'manual';
+          existingObj.hoverCursor = mode === 'manual' ? 'move' : 'default';
+          
+          if (existingObj.controls.deleteControl) {
+            existingObj.controls.deleteControl.visible = mode === 'manual';
+          }
+          if (existingObj.controls.rotateControl) {
+            existingObj.controls.rotateControl.visible = mode === 'manual';
+          }
+          existingObj.setControlsVisibility({
+            tl: false, tr: false, bl: false, br: false,
+            ml: false, mr: false, mt: false, mb: false,
+            mtr: false // Hide standard rotate handle
+          });
+
+          existingObj.setCoords();
+        }
+      } else {
+        // Load the pouch image dynamically
+        FabricImage.fromURL(product.imageUrl)
+          .then((img) => {
+            if (!fabricCanvasRef.current) return;
+            const imgW = cmToPx(product.widthCm);
+            const imgH = cmToPx(product.heightCm);
+
+            img.set({
+              left: cx,
+              top: cy,
+              originX: 'center',
+              originY: 'center',
+              angle: pl.rotation,
+              scaleX: imgW / img.width!,
+              scaleY: imgH / img.height!,
+              lockScalingX: true,
+              lockScalingY: true,
+              snapAngle: 90,
+              snapThreshold: 45,
+              borderColor: '#007af5',
+              borderScaleFactor: 2.5,
+              cornerColor: '#007af5',
+              cornerSize: 8,
+              transparentCorners: false,
+              selectable: mode === 'manual',
+              evented: mode === 'manual',
+              hoverCursor: mode === 'manual' ? 'move' : 'default',
+              data: { type: 'pouch', id: pl.id, productId: product.id }
+            });
+
+            // Assign controls and override visibility
+            img.controls.deleteControl = deleteControl;
+            img.controls.rotateControl = rotateControl;
+            img.setControlsVisibility({
+              tl: false, tr: false, bl: false, br: false,
+              ml: false, mr: false, mt: false, mb: false,
+              mtr: false // Hide standard rotate handle
+            });
+            img.controls.deleteControl.visible = mode === 'manual';
+            img.controls.rotateControl.visible = mode === 'manual';
+
+            canvas.add(img);
+            canvas.renderAll();
+          })
+          .catch(err => console.error("Error loading pouch image:", err));
+      }
+    });
+
+    // Make sure packing area rectangle guides stay behind pouches (but on top of background)
+    const packingAreas = canvas.getObjects().filter(obj => (obj as CustomFabricObject).data?.type === 'packingArea');
+    packingAreas.forEach(obj => canvas.sendObjectToBack(obj));
+
+    // Ensure the background image stays at the absolute bottom layer (index 0) using moveObjectTo
+    const bgImg = canvas.getObjects().find(obj => (obj as CustomFabricObject).data?.type === 'bagBackground');
+    if (bgImg) {
+      canvas.moveObjectTo(bgImg, 0);
+    }
+
+    canvas.renderAll();
+  }, [placements, mode, pocketInstances, products, bag]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', userSelect: 'none' }}>
-      <h3 style={{ margin: '0 0 10px 0' }}>Interactive SVG Layout</h3>
+      <h3 style={{ margin: '0 0 10px 0' }}>Interactive Fabric.js Layout</h3>
       <div style={{ 
         border: '1px solid #ccc', 
         borderRadius: '8px', 
@@ -253,199 +552,7 @@ export const BagCanvas: React.FC = () => {
         background: '#f0f0f0',
         padding: '10px'
       }}>
-        <svg 
-          ref={svgRef}
-          width={svgWidth} 
-          height={svgHeight} 
-          viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
-          onMouseDown={(e) => {
-            // Click on the empty space of SVG canvas clears the selection
-            if (e.target === svgRef.current) {
-              setSelectedId(null);
-            }
-          }}
-          style={{ display: 'block', maxWidth: '100%', height: 'auto' }}
-        >
-          {/* 1. Bag Base Image */}
-          <image 
-            href={bag.imageUrl} 
-            width={svgWidth} 
-            height={svgHeight} 
-            preserveAspectRatio="none"
-          />
-
-          {/* 2. Visual Packing Usable Area Outline (for reference) */}
-          {bag.packingAreasCm.map((area, idx) => (
-            <rect 
-              key={idx}
-              x={cmToPx(area.x)} 
-              y={cmToPx(area.y)} 
-              width={cmToPx(area.width)} 
-              height={cmToPx(area.height)} 
-              fill="none" 
-              stroke="red" 
-              strokeDasharray="4,4" 
-              strokeWidth="2"
-            />
-          ))}
-
-          {/* 3. Fitted Pockets Layer */}
-          <g id="pockets">
-            {placements
-              .filter(pl => pl.fitted)
-              .map((pl) => {
-                const instance = useBagStore.getState().pocketInstances.find(i => i.id === pl.id);
-                const product = instance ? products.find(p => p.id === instance.pocketId) : null;
-                
-                if (!product) return null;
-
-                const isDraggingThis = pl.id === draggedId && tempPos !== null;
-                const isRotatingThis = pl.id === rotatingId && tempRotation !== null;
-
-                const xCm = isDraggingThis ? tempPos.xCm : pl.xCm;
-                const yCm = isDraggingThis ? tempPos.yCm : pl.yCm;
-
-                // Center of placement bounding box (invariant to current render angle, but matches current translation)
-                const cx = cmToPx(xCm) + cmToPx(pl.widthCm) / 2;
-                const cy = cmToPx(yCm) + cmToPx(pl.heightCm) / 2;
-
-                // Render coordinates: Draw elements based on their UNROTATED sizes,
-                // and then apply group rotation around (cx, cy)!
-                const imgW = cmToPx(product.widthCm);
-                const imgH = cmToPx(product.heightCm);
-                
-                // Centering coordinates for unrotated pouch
-                const imgX = cx - imgW / 2;
-                const imgY = cy - imgH / 2;
-
-                const angle = isRotatingThis ? tempRotation : pl.rotation;
-                const groupTransform = angle !== 0 ? `rotate(${angle}, ${cx}, ${cy})` : undefined;
-
-                // Color of the outline box (green normally, red if dragged into an overlapping/invalid position)
-                let strokeColor = '#4CAF50';
-                if (isDraggingThis) {
-                  const proposedRect = {
-                    x: xCm,
-                    y: yCm,
-                    width: pl.widthCm,
-                    height: pl.heightCm
-                  };
-                  let inside = false;
-                  for (const bin of bag.packingAreasCm) {
-                    if (isInside(proposedRect, bin)) {
-                      inside = true;
-                      break;
-                    }
-                  }
-                  let overlaps = false;
-                  if (inside) {
-                    for (const other of placements) {
-                      if (other.id === pl.id || !other.fitted) continue;
-                      const otherRect = {
-                        x: other.xCm,
-                        y: other.yCm,
-                        width: other.widthCm,
-                        height: other.heightCm
-                      };
-                      if (intersects(proposedRect, otherRect)) {
-                        overlaps = true;
-                        break;
-                      }
-                    }
-                  }
-                  strokeColor = (inside && !overlaps) ? '#4CAF50' : '#f44336';
-                } else if (pl.id === selectedId) {
-                  strokeColor = '#007af5'; // Blue outline for active selection
-                }
-
-                const isSelected = pl.id === selectedId;
-                const isHovered = pl.id === hoveredId;
-                const showControls = isSelected || isHovered;
-
-                return (
-                  <g 
-                    key={pl.id}
-                    transform={groupTransform}
-                    onMouseDown={(e) => handleMouseDown(e, pl.id)}
-                    onMouseEnter={() => setHoveredId(pl.id)}
-                    onMouseLeave={() => setHoveredId(null)}
-                    style={{ cursor: mode === 'manual' ? 'move' : 'default' }}
-                  >
-                    <image 
-                      href={product.imageUrl} 
-                      x={imgX} 
-                      y={imgY} 
-                      width={imgW} 
-                      height={imgH}
-                      preserveAspectRatio="none"
-                    />
-                    <rect 
-                      x={imgX} 
-                      y={imgY} 
-                      width={imgW} 
-                      height={imgH} 
-                      fill="none" 
-                      stroke={strokeColor} 
-                      strokeWidth={isSelected ? "3" : "2"}
-                    />
-                    {showControls && (
-                      <>
-                        {/* Cancel/Delete Button (Top-Right of unrotated pouch) */}
-                        <g
-                          transform={`translate(${imgX + imgW}, ${imgY})`}
-                          onMouseDown={(e) => {
-                            e.stopPropagation(); // Stop dragging on cancel click
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation(); // Prevent selections
-                            removeProductInstance(pl.id);
-                          }}
-                          style={{ cursor: 'pointer' }}
-                        >
-                          <circle 
-                            r="12" 
-                            fill="rgba(50, 40, 40, 0.85)" 
-                            stroke="white" 
-                            strokeWidth="1.5" 
-                          />
-                          <path 
-                            d="M -3.5 -3.5 L 3.5 3.5 M -3.5 3.5 L 3.5 -3.5" 
-                            stroke="white" 
-                            strokeWidth="2" 
-                            strokeLinecap="round" 
-                          />
-                        </g>
-
-                        {/* Rotation Button (Top-Left of unrotated pouch) */}
-                        <g
-                          transform={`translate(${imgX}, ${imgY})`}
-                          onMouseDown={(e) => handleRotateMouseDown(e, pl.id)}
-                          style={{ cursor: 'alias' }}
-                        >
-                          <circle 
-                            r="12" 
-                            fill="rgba(40, 40, 50, 0.85)" 
-                            stroke="white" 
-                            strokeWidth="1.5" 
-                          />
-                          <path 
-                            d="M -4 -2 A 4 4 0 1 1 -2 4 M -5 -5 L -1 -3 L -3 1" 
-                            fill="none" 
-                            stroke="white" 
-                            strokeWidth="1.5" 
-                            strokeLinecap="round"
-                          />
-                        </g>
-                      </>
-                    )}
-                  </g>
-                );
-              })}
-          </g>
-        </svg>
+        <canvas ref={canvasRef} />
       </div>
     </div>
   );
