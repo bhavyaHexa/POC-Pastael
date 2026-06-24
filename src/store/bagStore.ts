@@ -1,0 +1,268 @@
+import { create } from 'zustand';
+import { MaxRectsPacker } from 'maxrects-packer';
+import type { BagTemplate, Pocket, Placement } from '../types';
+import { findValidPlacement } from '../utils/placement';
+
+export interface BagState {
+  bags: BagTemplate[];
+  bag: BagTemplate | null;
+  products: Pocket[];
+  // Selected pocket instances (can contain duplicates of the same pocket template)
+  pocketInstances: { id: string; pocketId: string }[];
+  // Current placement coordinates in cm
+  placements: Placement[];
+  mode: 'auto' | 'manual';
+  zoom: number;
+  
+  // Actions
+  setBag: (bagId: string) => void;
+  addProductInstance: (pocketId: string) => void;
+  removeProductInstance: (instanceId: string) => void;
+  updatePlacement: (placementId: string, updates: Partial<Placement>) => void;
+  setMode: (mode: 'auto' | 'manual') => void;
+  setZoom: (zoom: number) => void;
+  reset: () => void;
+  runAutoArrange: () => void;
+}
+
+// Initial mock data based on the design document
+const DEFAULT_BAGS: BagTemplate[] = [
+  {
+    id: 'bag-default',
+    name: 'Suitcase',
+    imageUrl: '/images/SuitCase.svg',
+    widthCm: 71.8,
+    heightCm: 46.9,
+    packingAreasCm: [
+      {
+        x: 3.5,
+        y: 2.5,
+        width: 30.0,
+        height: 42.0
+      },
+      {
+        x: 38.3,
+        y: 2.5,
+        width: 30.0,
+        height: 42.0
+      }
+    ]
+  }
+];
+
+const DEFAULT_PRODUCTS: Pocket[] = [
+  {
+    id: 'pouch-large',
+    name: 'Large Pouch',
+    imageUrl: '/images/BigPouch.svg',
+    widthCm: 20.0,
+    heightCm: 26.6,
+    canRotate: true
+  },
+  {
+    id: 'pouch-small',
+    name: 'Small Pouch',
+    imageUrl: '/images/SmallPouch.svg',
+    widthCm: 9.0,
+    heightCm: 17.7,
+    canRotate: true
+  }
+];
+
+export const useBagStore = create<BagState>((set, get) => ({
+  bags: DEFAULT_BAGS,
+  bag: DEFAULT_BAGS[0],
+  products: DEFAULT_PRODUCTS,
+  pocketInstances: [],
+  placements: [],
+  mode: 'auto',
+  zoom: 1.0,
+
+  setBag: (bagId) => {
+    const selectedBag = get().bags.find(b => b.id === bagId) || null;
+    set({ bag: selectedBag });
+    // Recalculate layout or reset placements if bag changes
+    get().runAutoArrange();
+  },
+
+  addProductInstance: (pocketId) => {
+    const { products, bag, placements, mode } = get();
+    const product = products.find(p => p.id === pocketId);
+    if (!product || !bag) return;
+
+    const instanceId = `${pocketId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const newInstance = { id: instanceId, pocketId };
+
+    set((state) => ({
+      pocketInstances: [...state.pocketInstances, newInstance]
+    }));
+
+    if (mode === 'auto') {
+      get().runAutoArrange();
+    } else {
+      // Manual mode: find a valid non-overlapping location without resetting other placements
+      const placementResult = findValidPlacement(product.widthCm, product.heightCm, placements, bag);
+      set((state) => ({
+        placements: [
+          ...state.placements,
+          {
+            id: instanceId,
+            xCm: placementResult.xCm,
+            yCm: placementResult.yCm,
+            widthCm: product.widthCm,
+            heightCm: product.heightCm,
+            rotation: 0,
+            fitted: placementResult.fitted
+          }
+        ]
+      }));
+    }
+  },
+
+  removeProductInstance: (instanceId) => {
+    set((state) => ({
+      pocketInstances: state.pocketInstances.filter(inst => inst.id !== instanceId),
+      placements: state.placements.filter(pl => pl.id !== instanceId)
+    }));
+
+    if (get().mode === 'auto') {
+      get().runAutoArrange();
+    }
+  },
+
+  updatePlacement: (placementId, updates) => {
+    set((state) => ({
+      placements: state.placements.map(pl => 
+        pl.id === placementId ? { ...pl, ...updates } : pl
+      )
+    }));
+  },
+
+  setMode: (mode) => {
+    set({ mode });
+    if (mode === 'auto') {
+      get().runAutoArrange();
+    }
+  },
+
+  setZoom: (zoom) => set({ zoom }),
+
+  reset: () => {
+    set({
+      bag: DEFAULT_BAGS[0],
+      pocketInstances: [],
+      placements: [],
+      mode: 'auto',
+      zoom: 1.0
+    });
+  },
+
+  runAutoArrange: () => {
+    const { bag, pocketInstances, products } = get();
+    if (!bag || pocketInstances.length === 0) {
+      set({ placements: [] });
+      return;
+    }
+
+    const leftBin = bag.packingAreasCm[0];
+    const rightBin = bag.packingAreasCm[1] || leftBin;
+
+    const packItems = (allowRotation: boolean) => {
+      const leftPacker = new MaxRectsPacker(leftBin.width, leftBin.height, 0, {
+        smart: false,
+        pot: false,
+        square: false,
+        allowRotation
+      });
+
+      const rightPacker = new MaxRectsPacker(rightBin.width, rightBin.height, 0, {
+        smart: false,
+        pot: false,
+        square: false,
+        allowRotation
+      });
+
+      // Sort pocket instances by area (large to small) to improve packing density
+      const sortedInstances = [...pocketInstances].sort((a, b) => {
+        const pA = products.find(p => p.id === a.pocketId)!;
+        const pB = products.find(p => p.id === b.pocketId)!;
+        return (pB.widthCm * pB.heightCm) - (pA.widthCm * pA.heightCm);
+      });
+
+      const placements: Placement[] = [];
+      let allFitted = true;
+
+      for (const instance of sortedInstances) {
+        const product = products.find(p => p.id === instance.pocketId)!;
+
+        // 1. Try packing in Left compartment
+        const rect = leftPacker.add(product.widthCm, product.heightCm, instance.id);
+
+        if (rect && !rect.oversized) {
+          placements.push({
+            id: instance.id,
+            xCm: leftBin.x + rect.x,
+            yCm: leftBin.y + rect.y,
+            widthCm: rect.width,
+            heightCm: rect.height,
+            rotation: rect.rot ? 90 : 0,
+            fitted: true
+          });
+        } else {
+          // If it was added but didn't fit, remove it from the left packer's bin
+          if (rect && leftPacker.bins[0]) {
+            leftPacker.bins[0].rects = leftPacker.bins[0].rects.filter((r: any) => r !== rect);
+          }
+
+          // 2. Try packing in Right compartment
+          const rectRight = rightPacker.add(product.widthCm, product.heightCm, instance.id);
+
+          if (rectRight && !rectRight.oversized) {
+            placements.push({
+              id: instance.id,
+              xCm: rightBin.x + rectRight.x,
+              yCm: rightBin.y + rectRight.y,
+              widthCm: rectRight.width,
+              heightCm: rectRight.height,
+              rotation: rectRight.rot ? 90 : 0,
+              fitted: true
+            });
+          } else {
+            // If it was added but didn't fit, remove it from the right packer's bin
+            if (rectRight && rightPacker.bins[0]) {
+              rightPacker.bins[0].rects = rightPacker.bins[0].rects.filter((r: any) => r !== rectRight);
+            }
+
+            allFitted = false;
+            // Unfitted pouch
+            placements.push({
+              id: instance.id,
+              xCm: 0,
+              yCm: 0,
+              widthCm: product.widthCm,
+              heightCm: product.heightCm,
+              rotation: 0,
+              fitted: false
+            });
+          }
+        }
+      }
+      return { placements, allFitted };
+    };
+
+    // Try packing without rotation first
+    let result = packItems(false);
+
+    // If some items didn't fit, try with rotation to see if we can pack more
+    if (!result.allFitted) {
+      const resultWithRotation = packItems(true);
+      const fittedWithout = result.placements.filter(p => p.fitted).length;
+      const fittedWith = resultWithRotation.placements.filter(p => p.fitted).length;
+      if (fittedWith > fittedWithout) {
+        result = resultWithRotation;
+      }
+    }
+
+    set({ placements: result.placements });
+  }
+}));
