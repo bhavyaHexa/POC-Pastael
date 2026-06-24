@@ -104,7 +104,7 @@ export const BagCanvas: React.FC = () => {
       const coords = getSvgCoords(e.clientX, e.clientY);
       const currentAngle = Math.atan2(coords.y - cy, coords.x - cx) * 180 / Math.PI;
 
-      let diff = currentAngle - startAngle;
+      const diff = currentAngle - startAngle;
       let newRot = (startRotation + diff) % 360;
       if (newRot < 0) newRot += 360;
 
@@ -176,7 +176,7 @@ export const BagCanvas: React.FC = () => {
       }
 
       // Snapping: if click, toggle directly. If drag, snap to nearest 0 or 90 based on 45 threshold.
-      let snapped: 0 | 90 = 0;
+      let snapped: 0 | 90;
       if (!hasMoved) {
         snapped = placement.rotation === 0 ? 90 : 0;
       } else {

@@ -9,6 +9,8 @@ export const ProductList: React.FC = () => {
     removeProductInstance,
     bag,
     addPackingCube,
+    addPackingCubeMedium,
+    addPackingCubeLarge,
   } = useBagStore();
 
   return (
@@ -39,6 +41,38 @@ export const ProductList: React.FC = () => {
           }}
         >
           Packing Cube (Small)
+        </button>
+        <button
+          onClick={addPackingCubeMedium}
+          style={{
+            padding: "10px 15px",
+            border: "1px solid #61afef",
+            background: "#f0f7ff",
+            color: "#2c78c7",
+            borderRadius: "6px",
+            cursor: "pointer",
+            fontWeight: 600,
+            width: "100%",
+            transition: "background 0.2s",
+          }}
+        >
+          Packing Cube (Medium)
+        </button>
+        <button
+          onClick={addPackingCubeLarge}
+          style={{
+            padding: "10px 15px",
+            border: "1px solid #98c379",
+            background: "#f5fbf0",
+            color: "#3e781e",
+            borderRadius: "6px",
+            cursor: "pointer",
+            fontWeight: 600,
+            width: "100%",
+            transition: "background 0.2s",
+          }}
+        >
+          Packing Cube (Large)
         </button>
       </div>
 
