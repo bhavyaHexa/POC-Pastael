@@ -54,7 +54,7 @@ const DEFAULT_BAGS: BagTemplate[] = [
 const DEFAULT_PRODUCTS: Pocket[] = [
   {
     id: "pouch-large",
-    name: "Large Pouch",
+    name: "S",
     imageUrl: "/images/BigPouch.svg",
     widthCm: 20.9,
     heightCm: 26.0,
@@ -62,7 +62,7 @@ const DEFAULT_PRODUCTS: Pocket[] = [
   },
   {
     id: "pouch-small",
-    name: "Small Pouch",
+    name: "XS",
     imageUrl: "/images/SmallPouch.svg",
     widthCm: 10.9,
     heightCm: 24.9,
@@ -129,23 +129,23 @@ export const useBagStore = create<BagState>((set, get) => ({
     const { products, bag, placements, mode } = get();
     if (!bag) return;
 
-    const largeProduct = products.find(p => p.id === 'pouch-large');
-    const smallProduct = products.find(p => p.id === 'pouch-small');
+    const largeProduct = products.find((p) => p.id === "pouch-large");
+    const smallProduct = products.find((p) => p.id === "pouch-small");
     if (!largeProduct || !smallProduct) return;
 
     const largeInstanceId = `pouch-large-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const smallInstanceId = `pouch-small-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
     const newInstances = [
-      { id: largeInstanceId, pocketId: 'pouch-large' },
-      { id: smallInstanceId, pocketId: 'pouch-small' }
+      { id: largeInstanceId, pocketId: "pouch-large" },
+      { id: smallInstanceId, pocketId: "pouch-small" },
     ];
 
     set((state) => ({
-      pocketInstances: [...state.pocketInstances, ...newInstances]
+      pocketInstances: [...state.pocketInstances, ...newInstances],
     }));
 
-    if (mode === 'auto') {
+    if (mode === "auto") {
       get().runAutoArrange();
     } else {
       // Manual mode: place sequentially without overwriting intermediate state
@@ -155,7 +155,7 @@ export const useBagStore = create<BagState>((set, get) => ({
         largeProduct.widthCm,
         largeProduct.heightCm,
         currentPlacements,
-        bag
+        bag,
       );
       const largePlacement = {
         id: largeInstanceId,
@@ -164,7 +164,7 @@ export const useBagStore = create<BagState>((set, get) => ({
         widthCm: largeProduct.widthCm,
         heightCm: largeProduct.heightCm,
         rotation: 0 as const,
-        fitted: largePlacementResult.fitted
+        fitted: largePlacementResult.fitted,
       };
 
       if (largePlacement.fitted) {
@@ -175,7 +175,7 @@ export const useBagStore = create<BagState>((set, get) => ({
         smallProduct.widthCm,
         smallProduct.heightCm,
         currentPlacements,
-        bag
+        bag,
       );
       const smallPlacement = {
         id: smallInstanceId,
@@ -184,15 +184,11 @@ export const useBagStore = create<BagState>((set, get) => ({
         widthCm: smallProduct.widthCm,
         heightCm: smallProduct.heightCm,
         rotation: 0 as const,
-        fitted: smallPlacementResult.fitted
+        fitted: smallPlacementResult.fitted,
       };
 
       set((state) => ({
-        placements: [
-          ...state.placements,
-          largePlacement,
-          smallPlacement
-        ]
+        placements: [...state.placements, largePlacement, smallPlacement],
       }));
     }
   },
@@ -251,7 +247,7 @@ export const useBagStore = create<BagState>((set, get) => ({
     const packCompartment = (
       bin: typeof leftBin,
       instancesToPack: typeof pocketInstances,
-      allowRotation: boolean
+      allowRotation: boolean,
     ) => {
       const placements: Placement[] = [];
       const fittedInstances: { id: string; product: Pocket }[] = [];
@@ -271,11 +267,7 @@ export const useBagStore = create<BagState>((set, get) => ({
           packer.add(prev.product.widthCm, prev.product.heightCm, prev.id);
         }
 
-        const rect = packer.add(
-          product.widthCm,
-          product.heightCm,
-          instance.id
-        );
+        const rect = packer.add(product.widthCm, product.heightCm, instance.id);
 
         const fits =
           rect &&
@@ -299,7 +291,7 @@ export const useBagStore = create<BagState>((set, get) => ({
 
       const occupiedArea = fittedInstances.reduce(
         (sum, inst) => sum + inst.product.widthCm * inst.product.heightCm,
-        0
+        0,
       );
 
       return {
@@ -330,7 +322,7 @@ export const useBagStore = create<BagState>((set, get) => ({
     // Determine remaining items that didn't fit on the left side
     const leftFittedIds = new Set(leftResult.placements.map((p) => p.id));
     const remainingInstances = sortedInstances.filter(
-      (inst) => !leftFittedIds.has(inst.id)
+      (inst) => !leftFittedIds.has(inst.id),
     );
 
     // 2. Pack Right compartment (if it exists) with remaining items
@@ -338,8 +330,16 @@ export const useBagStore = create<BagState>((set, get) => ({
     let finalRemainingInstances = remainingInstances;
 
     if (rightBin && remainingInstances.length > 0) {
-      const rightNoRotation = packCompartment(rightBin, remainingInstances, false);
-      const rightWithRotation = packCompartment(rightBin, remainingInstances, true);
+      const rightNoRotation = packCompartment(
+        rightBin,
+        remainingInstances,
+        false,
+      );
+      const rightWithRotation = packCompartment(
+        rightBin,
+        remainingInstances,
+        true,
+      );
 
       const useRightRotated =
         rightWithRotation.fittedCount > rightNoRotation.fittedCount ||
@@ -351,23 +351,25 @@ export const useBagStore = create<BagState>((set, get) => ({
 
       const rightFittedIds = new Set(rightResult.placements.map((p) => p.id));
       finalRemainingInstances = remainingInstances.filter(
-        (inst) => !rightFittedIds.has(inst.id)
+        (inst) => !rightFittedIds.has(inst.id),
       );
     }
 
     // 3. Mark items that didn't fit in either compartment
-    const unfittedPlacements: Placement[] = finalRemainingInstances.map((instance) => {
-      const product = products.find((p) => p.id === instance.pocketId)!;
-      return {
-        id: instance.id,
-        xCm: 0,
-        yCm: 0,
-        widthCm: product.widthCm,
-        heightCm: product.heightCm,
-        rotation: 0,
-        fitted: false,
-      };
-    });
+    const unfittedPlacements: Placement[] = finalRemainingInstances.map(
+      (instance) => {
+        const product = products.find((p) => p.id === instance.pocketId)!;
+        return {
+          id: instance.id,
+          xCm: 0,
+          yCm: 0,
+          widthCm: product.widthCm,
+          heightCm: product.heightCm,
+          rotation: 0,
+          fitted: false,
+        };
+      },
+    );
 
     // Combine all placements and set in state
     set({
