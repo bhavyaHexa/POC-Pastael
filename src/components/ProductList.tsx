@@ -1,73 +1,119 @@
-import React from 'react';
-import { useBagStore } from '../store/bagStore';
-import { cmToPx } from '../utils/scaling';
+import React from "react";
+import { useBagStore } from "../store/bagStore";
 
 export const ProductList: React.FC = () => {
-  const { products, pocketInstances, placements, addProductInstance, removeProductInstance, bag } = useBagStore();
+  const {
+    products,
+    pocketInstances,
+    placements,
+    removeProductInstance,
+    bag,
+    addPackingCube,
+  } = useBagStore();
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <h3 style={{ margin: '0 0 15px 0' }}>Product Selection</h3>
-      
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      <h3 style={{ margin: "0 0 15px 0" }}>Product Selection</h3>
+
       {/* Available Pockets buttons */}
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-        {products.map(p => (
-          <button
-            key={p.id}
-            onClick={() => addProductInstance(p.id)}
-            style={{
-              padding: '10px 15px',
-              border: '1px solid #4aa0e6',
-              background: '#eef6fc',
-              color: '#1b63b2',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontWeight: 600,
-              flex: 1
-            }}
-          >
-            Add {p.name}
-          </button>
-        ))}
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "10px",
+          marginBottom: "20px",
+        }}
+      >
+        <button
+          onClick={addPackingCube}
+          style={{
+            padding: "10px 15px",
+            border: "1px solid #c678dd",
+            background: "#fdf6ff",
+            color: "#7c3a96",
+            borderRadius: "6px",
+            cursor: "pointer",
+            fontWeight: 600,
+            width: "100%",
+            transition: "background 0.2s",
+          }}
+        >
+          Add Packing Cube (Pair)
+        </button>
       </div>
 
-      <h4 style={{ margin: '0 0 10px 0' }}>Selected Pockets</h4>
-      <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        {pocketInstances.length === 0 ? (
-          <div style={{ color: '#888', fontStyle: 'italic', padding: '10px 0' }}>
-            No pockets selected yet. Add some above!
+      {/* Fitted instances list */}
+      <h4 style={{ margin: "0 0 10px 0" }}>Selected Pockets (Fitted)</h4>
+      <div
+        style={{
+          flex: 1,
+          overflowY: "auto",
+          display: "flex",
+          flexDirection: "column",
+          gap: "8px",
+          marginBottom: "15px",
+        }}
+      >
+        {pocketInstances.filter(
+          (inst) => placements.find((p) => p.id === inst.id)?.fitted,
+        ).length === 0 ? (
+          <div
+            style={{ color: "#888", fontStyle: "italic", padding: "10px 0" }}
+          >
+            No pockets fitted in the bag yet.
           </div>
         ) : (
-          pocketInstances.map((instance) => {
-            const product = products.find(p => p.id === instance.pocketId)!;
-            const placement = placements.find(pl => pl.id === instance.id);
-            const isFitted = placement ? placement.fitted : false;
+          pocketInstances
+            .filter((inst) => placements.find((p) => p.id === inst.id)?.fitted)
+            .map((instance) => {
+              const product = products.find((p) => p.id === instance.pocketId)!;
+              const placement = placements.find((pl) => pl.id === instance.id)!;
 
-            return (
-              <div 
-                key={instance.id} 
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '8px 12px',
-                  background: '#f9f9f9',
-                  border: `1px solid ${isFitted ? '#eee' : '#ffcdd2'}`,
-                  borderRadius: '6px'
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <img 
-                    src={product.imageUrl} 
-                    alt={product.name} 
-                    style={{ width: '30px', height: '20px', objectFit: 'contain' }}
-                  />
-                  <div style={{ color: '#222' }}>
-                    <span style={{ fontWeight: 600 }}>{product.name}</span>
-                    <div style={{ fontSize: '0.8em', color: '#555', marginTop: '2px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                      <div>Size: {product.widthCm}x{product.heightCm} cm ({cmToPx(product.widthCm)}x{cmToPx(product.heightCm)} px)</div>
-                      {isFitted && placement ? (
-                        (() => {
+              return (
+                <div
+                  key={instance.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "8px 12px",
+                    background: "#f9f9f9",
+                    border: "1px solid #eee",
+                    borderRadius: "6px",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                    }}
+                  >
+                    <img
+                      src={product.imageUrl}
+                      alt={product.name}
+                      style={{
+                        width: "30px",
+                        height: "20px",
+                        objectFit: "contain",
+                      }}
+                    />
+                    <div style={{ color: "#222" }}>
+                      <span style={{ fontWeight: 600 }}>{product.name}</span>
+                      <div
+                        style={{
+                          fontSize: "0.8em",
+                          color: "#555",
+                          marginTop: "2px",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "2px",
+                        }}
+                      >
+                        <div>
+                          Size: {product.widthCm}x{product.heightCm} cm
+                        </div>
+                        {(() => {
                           const leftBin = bag?.packingAreasCm[0];
                           const rightBin = bag?.packingAreasCm[1] || leftBin;
                           const bin = placement.xCm < 35.0 ? leftBin : rightBin;
@@ -76,56 +122,145 @@ export const ProductList: React.FC = () => {
 
                           return (
                             <>
-                              <div style={{ color: placement.xCm < 35.0 ? '#2e7d32' : '#1565c0', fontWeight: 600 }}>
-                                Placed: {placement.xCm < 35.0 ? 'Left Side' : 'Right Side'}
+                              <div
+                                style={{
+                                  color:
+                                    placement.xCm < 35.0
+                                      ? "#2e7d32"
+                                      : "#1565c0",
+                                  fontWeight: 600,
+                                }}
+                              >
+                                Placed:{" "}
+                                {placement.xCm < 35.0
+                                  ? "Left Side"
+                                  : "Right Side"}
                               </div>
                               <div>
-                                Offset: x: {offsetX.toFixed(1)}cm, 
-                                y: {offsetY.toFixed(1)}cm
+                                Offset: x: {offsetX.toFixed(1)}cm, y:{" "}
+                                {offsetY.toFixed(1)}cm
                               </div>
                               <div>
-                                Box: {placement.widthCm.toFixed(1)}x{placement.heightCm.toFixed(1)} cm
+                                Box: {placement.widthCm.toFixed(1)}x
+                                {placement.heightCm.toFixed(1)} cm
                               </div>
                               <div>Rotation: {placement.rotation}°</div>
                             </>
                           );
-                        })()
-                      ) : (
-                        <div style={{ color: '#888', fontStyle: 'italic' }}>Not Placed</div>
-                      )}
+                        })()}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  {!isFitted && (
-                    <span 
-                      title="Item could not be fitted in the bag usable area!" 
-                      style={{ color: '#d32f2f', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '2px' }}
-                    >
-                      ⚠ <span style={{ fontSize: '0.85em' }}>Not Fitted</span>
-                    </span>
-                  )}
                   <button
                     onClick={() => removeProductInstance(instance.id)}
                     style={{
-                      border: 'none',
-                      background: 'none',
-                      color: '#d32f2f',
-                      cursor: 'pointer',
-                      fontSize: '1.2em',
-                      padding: '4px'
+                      border: "none",
+                      background: "none",
+                      color: "#d32f2f",
+                      cursor: "pointer",
+                      fontSize: "1.2em",
+                      padding: "4px",
                     }}
                     title="Remove item"
                   >
                     ×
                   </button>
                 </div>
-              </div>
-            );
-          })
+              );
+            })
         )}
       </div>
+
+      {/* Unfitted instances alert panel */}
+      {(() => {
+        const unfitted = pocketInstances.filter((inst) => {
+          const placement = placements.find((p) => p.id === inst.id);
+          return placement ? !placement.fitted : true;
+        });
+
+        if (unfitted.length === 0) return null;
+
+        return (
+          <div
+            style={{
+              background: "#fff2f2",
+              border: "1px solid #ffcdd2",
+              borderRadius: "8px",
+              padding: "12px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "8px",
+              maxHeight: "160px",
+              overflowY: "auto",
+            }}
+          >
+            <div
+              style={{
+                color: "#d32f2f",
+                fontWeight: "bold",
+                display: "flex",
+                alignItems: "center",
+                gap: "5px",
+                fontSize: "0.9em",
+              }}
+            >
+              <span>⚠️</span>
+              <span>Unfitted Items Alert ({unfitted.length})</span>
+            </div>
+            <div style={{ fontSize: "0.8em", color: "#555" }}>
+              These items cannot fit in the compartments:
+            </div>
+            <div
+              style={{ display: "flex", flexDirection: "column", gap: "6px" }}
+            >
+              {unfitted.map((instance) => {
+                const product = products.find(
+                  (p) => p.id === instance.pocketId,
+                )!;
+                return (
+                  <div
+                    key={instance.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      background: "#fff",
+                      border: "1px solid #ffebee",
+                      padding: "6px 10px",
+                      borderRadius: "6px",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: "0.85em",
+                        fontWeight: 600,
+                        color: "#333",
+                      }}
+                    >
+                      {product.name} ({product.widthCm}x{product.heightCm} cm)
+                    </span>
+                    <button
+                      onClick={() => removeProductInstance(instance.id)}
+                      style={{
+                        border: "none",
+                        background: "none",
+                        color: "#d32f2f",
+                        cursor: "pointer",
+                        fontSize: "1.1em",
+                        padding: "2px",
+                      }}
+                      title="Remove item"
+                    >
+                      ×
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };

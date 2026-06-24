@@ -23,6 +23,7 @@ export interface BagState {
   setZoom: (zoom: number) => void;
   reset: () => void;
   runAutoArrange: () => void;
+  addPackingCube: () => void;
 }
 
 // Initial mock data based on the design document
@@ -120,6 +121,78 @@ export const useBagStore = create<BagState>((set, get) => ({
             fitted: placementResult.fitted,
           },
         ],
+      }));
+    }
+  },
+
+  addPackingCube: () => {
+    const { products, bag, placements, mode } = get();
+    if (!bag) return;
+
+    const largeProduct = products.find(p => p.id === 'pouch-large');
+    const smallProduct = products.find(p => p.id === 'pouch-small');
+    if (!largeProduct || !smallProduct) return;
+
+    const largeInstanceId = `pouch-large-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const smallInstanceId = `pouch-small-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    const newInstances = [
+      { id: largeInstanceId, pocketId: 'pouch-large' },
+      { id: smallInstanceId, pocketId: 'pouch-small' }
+    ];
+
+    set((state) => ({
+      pocketInstances: [...state.pocketInstances, ...newInstances]
+    }));
+
+    if (mode === 'auto') {
+      get().runAutoArrange();
+    } else {
+      // Manual mode: place sequentially without overwriting intermediate state
+      const currentPlacements = [...placements];
+
+      const largePlacementResult = findValidPlacement(
+        largeProduct.widthCm,
+        largeProduct.heightCm,
+        currentPlacements,
+        bag
+      );
+      const largePlacement = {
+        id: largeInstanceId,
+        xCm: largePlacementResult.xCm,
+        yCm: largePlacementResult.yCm,
+        widthCm: largeProduct.widthCm,
+        heightCm: largeProduct.heightCm,
+        rotation: 0 as const,
+        fitted: largePlacementResult.fitted
+      };
+
+      if (largePlacement.fitted) {
+        currentPlacements.push(largePlacement);
+      }
+
+      const smallPlacementResult = findValidPlacement(
+        smallProduct.widthCm,
+        smallProduct.heightCm,
+        currentPlacements,
+        bag
+      );
+      const smallPlacement = {
+        id: smallInstanceId,
+        xCm: smallPlacementResult.xCm,
+        yCm: smallPlacementResult.yCm,
+        widthCm: smallProduct.widthCm,
+        heightCm: smallProduct.heightCm,
+        rotation: 0 as const,
+        fitted: smallPlacementResult.fitted
+      };
+
+      set((state) => ({
+        placements: [
+          ...state.placements,
+          largePlacement,
+          smallPlacement
+        ]
       }));
     }
   },
