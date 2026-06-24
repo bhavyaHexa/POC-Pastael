@@ -175,151 +175,134 @@ export const useBagStore = create<BagState>((set, get) => ({
     const rightBin =
       bag.packingAreasCm.length > 1 ? bag.packingAreasCm[1] : null;
 
-    const packItems = (allowRotation: boolean) => {
-      // Sort pocket instances by area (large to small) to improve packing density
-      const sortedInstances = [...pocketInstances].sort((a, b) => {
-        const pA = products.find((p) => p.id === a.pocketId)!;
-        const pB = products.find((p) => p.id === b.pocketId)!;
-        return pB.widthCm * pB.heightCm - pA.widthCm * pA.heightCm;
-      });
-
+    const packCompartment = (
+      bin: typeof leftBin,
+      instancesToPack: typeof pocketInstances,
+      allowRotation: boolean
+    ) => {
       const placements: Placement[] = [];
-      let allFitted = true;
+      const fittedInstances: { id: string; product: Pocket }[] = [];
 
-      // Keep track of which items have successfully been fitted in each compartment
-      const leftFitted: { id: string; product: Pocket }[] = [];
-      const rightFitted: { id: string; product: Pocket }[] = [];
-
-      for (const instance of sortedInstances) {
+      for (const instance of instancesToPack) {
         const product = products.find((p) => p.id === instance.pocketId)!;
 
-        // 1. Try packing in Left compartment
-        // We reconstruct the left packer from scratch to prevent any internal state corruption
-        const leftPacker = new MaxRectsPacker(
-          leftBin.width,
-          leftBin.height,
-          0,
-          {
-            smart: false,
-            pot: false,
-            square: false,
-            allowRotation,
-          },
-        );
-        for (const prev of leftFitted) {
-          leftPacker.add(prev.product.widthCm, prev.product.heightCm, prev.id);
+        // Reconstruct packer from scratch to prevent internal state issues
+        const packer = new MaxRectsPacker(bin.width, bin.height, 0, {
+          smart: false,
+          pot: false,
+          square: false,
+          allowRotation,
+        });
+
+        for (const prev of fittedInstances) {
+          packer.add(prev.product.widthCm, prev.product.heightCm, prev.id);
         }
-        const rectLeft = leftPacker.add(
+
+        const rect = packer.add(
           product.widthCm,
           product.heightCm,
-          instance.id,
+          instance.id
         );
 
-        const fitsInLeft =
-          rectLeft &&
-          !rectLeft.oversized &&
-          leftPacker.bins.length === 1 &&
-          leftPacker.bins[0].rects.includes(rectLeft);
+        const fits =
+          rect &&
+          !rect.oversized &&
+          packer.bins.length === 1 &&
+          packer.bins[0].rects.includes(rect);
 
-        if (fitsInLeft) {
-          leftFitted.push({ id: instance.id, product });
+        if (fits) {
+          fittedInstances.push({ id: instance.id, product });
           placements.push({
             id: instance.id,
-            xCm: leftBin.x + rectLeft.x,
-            yCm: leftBin.y + rectLeft.y,
-            widthCm: rectLeft.width,
-            heightCm: rectLeft.height,
-            rotation: rectLeft.rot ? 90 : 0,
+            xCm: bin.x + rect.x,
+            yCm: bin.y + rect.y,
+            widthCm: rect.width,
+            heightCm: rect.height,
+            rotation: rect.rot ? 90 : 0,
             fitted: true,
-          });
-        } else if (rightBin) {
-          // 2. Try packing in Right compartment (if it exists)
-          const rightPacker = new MaxRectsPacker(
-            rightBin.width,
-            rightBin.height,
-            0,
-            {
-              smart: false,
-              pot: false,
-              square: false,
-              allowRotation,
-            },
-          );
-          for (const prev of rightFitted) {
-            rightPacker.add(
-              prev.product.widthCm,
-              prev.product.heightCm,
-              prev.id,
-            );
-          }
-          const rectRight = rightPacker.add(
-            product.widthCm,
-            product.heightCm,
-            instance.id,
-          );
-
-          const fitsInRight =
-            rectRight &&
-            !rectRight.oversized &&
-            rightPacker.bins.length === 1 &&
-            rightPacker.bins[0].rects.includes(rectRight);
-
-          if (fitsInRight) {
-            rightFitted.push({ id: instance.id, product });
-            placements.push({
-              id: instance.id,
-              xCm: rightBin.x + rectRight.x,
-              yCm: rightBin.y + rectRight.y,
-              widthCm: rectRight.width,
-              heightCm: rectRight.height,
-              rotation: rectRight.rot ? 90 : 0,
-              fitted: true,
-            });
-          } else {
-            allFitted = false;
-            // Unfitted pouch
-            placements.push({
-              id: instance.id,
-              xCm: 0,
-              yCm: 0,
-              widthCm: product.widthCm,
-              heightCm: product.heightCm,
-              rotation: 0,
-              fitted: false,
-            });
-          }
-        } else {
-          allFitted = false;
-          // Unfitted pouch (no right bin available)
-          placements.push({
-            id: instance.id,
-            xCm: 0,
-            yCm: 0,
-            widthCm: product.widthCm,
-            heightCm: product.heightCm,
-            rotation: 0,
-            fitted: false,
           });
         }
       }
-      return { placements, allFitted };
+
+      const occupiedArea = fittedInstances.reduce(
+        (sum, inst) => sum + inst.product.widthCm * inst.product.heightCm,
+        0
+      );
+
+      return {
+        placements,
+        fittedCount: fittedInstances.length,
+        occupiedArea,
+      };
     };
 
-    // Try packing without rotation first
-    let result = packItems(false);
+    // Sort pocket instances by area (large to small) to improve packing density
+    const sortedInstances = [...pocketInstances].sort((a, b) => {
+      const pA = products.find((p) => p.id === a.pocketId)!;
+      const pB = products.find((p) => p.id === b.pocketId)!;
+      return pB.widthCm * pB.heightCm - pA.widthCm * pA.heightCm;
+    });
 
-    // If some items didn't fit, try with rotation to see if we can pack more
-    if (!result.allFitted) {
-      const resultWithRotation = packItems(true);
-      const fittedWithout = result.placements.filter((p) => p.fitted).length;
-      const fittedWith = resultWithRotation.placements.filter(
-        (p) => p.fitted,
-      ).length;
-      if (fittedWith > fittedWithout) {
-        result = resultWithRotation;
-      }
+    // 1. Pack Left compartment: try without and with rotation to find the best layout
+    const leftNoRotation = packCompartment(leftBin, sortedInstances, false);
+    const leftWithRotation = packCompartment(leftBin, sortedInstances, true);
+
+    const useLeftRotated =
+      leftWithRotation.fittedCount > leftNoRotation.fittedCount ||
+      (leftWithRotation.fittedCount === leftNoRotation.fittedCount &&
+        leftWithRotation.occupiedArea > leftNoRotation.occupiedArea);
+
+    const leftResult = useLeftRotated ? leftWithRotation : leftNoRotation;
+
+    // Determine remaining items that didn't fit on the left side
+    const leftFittedIds = new Set(leftResult.placements.map((p) => p.id));
+    const remainingInstances = sortedInstances.filter(
+      (inst) => !leftFittedIds.has(inst.id)
+    );
+
+    // 2. Pack Right compartment (if it exists) with remaining items
+    const rightPlacements: Placement[] = [];
+    let finalRemainingInstances = remainingInstances;
+
+    if (rightBin && remainingInstances.length > 0) {
+      const rightNoRotation = packCompartment(rightBin, remainingInstances, false);
+      const rightWithRotation = packCompartment(rightBin, remainingInstances, true);
+
+      const useRightRotated =
+        rightWithRotation.fittedCount > rightNoRotation.fittedCount ||
+        (rightWithRotation.fittedCount === rightNoRotation.fittedCount &&
+          rightWithRotation.occupiedArea > rightNoRotation.occupiedArea);
+
+      const rightResult = useRightRotated ? rightWithRotation : rightNoRotation;
+      rightPlacements.push(...rightResult.placements);
+
+      const rightFittedIds = new Set(rightResult.placements.map((p) => p.id));
+      finalRemainingInstances = remainingInstances.filter(
+        (inst) => !rightFittedIds.has(inst.id)
+      );
     }
 
-    set({ placements: result.placements });
+    // 3. Mark items that didn't fit in either compartment
+    const unfittedPlacements: Placement[] = finalRemainingInstances.map((instance) => {
+      const product = products.find((p) => p.id === instance.pocketId)!;
+      return {
+        id: instance.id,
+        xCm: 0,
+        yCm: 0,
+        widthCm: product.widthCm,
+        heightCm: product.heightCm,
+        rotation: 0,
+        fitted: false,
+      };
+    });
+
+    // Combine all placements and set in state
+    set({
+      placements: [
+        ...leftResult.placements,
+        ...rightPlacements,
+        ...unfittedPlacements,
+      ],
+    });
   },
 }));
