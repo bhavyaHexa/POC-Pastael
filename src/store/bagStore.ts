@@ -24,6 +24,8 @@ export interface BagState {
   reset: () => void;
   runAutoArrange: () => void;
   addPackingCube: () => void;
+  addPackingCubeMedium: () => void;
+  addPackingCubeLarge: () => void;
 }
 
 // Initial mock data based on the design document
@@ -38,13 +40,13 @@ const DEFAULT_BAGS: BagTemplate[] = [
       {
         x: 3.5,
         y: 4.0,
-        width: 32.0,
+        width: 33.0,
         height: 47.0,
       },
       {
         x: 41,
         y: 4.0,
-        width: 32.0,
+        width: 33.0,
         height: 47.0,
       },
     ],
@@ -55,7 +57,7 @@ const DEFAULT_PRODUCTS: Pocket[] = [
   {
     id: "pouch-large",
     name: "S",
-    imageUrl: "/images/BigPouch.svg",
+    imageUrl: "/images/S.svg",
     widthCm: 20.9,
     heightCm: 26.0,
     canRotate: true,
@@ -63,9 +65,41 @@ const DEFAULT_PRODUCTS: Pocket[] = [
   {
     id: "pouch-small",
     name: "XS",
-    imageUrl: "/images/SmallPouch.svg",
+    imageUrl: "/images/XS.svg",
     widthCm: 10.9,
     heightCm: 24.9,
+    canRotate: true,
+  },
+  {
+    id: "pouch-medium",
+    name: "M",
+    imageUrl: "/images/M.svg",
+    widthCm: 18,
+    heightCm: 33,
+    canRotate: true,
+  },
+  {
+    id: "pouch-xlarge",
+    name: "L",
+    imageUrl: "/images/L.svg",
+    widthCm: 24.9,
+    heightCm: 33,
+    canRotate: true,
+  },
+  {
+    id: "pouch-xxlarge",
+    name: "XL",
+    imageUrl: "/images/XL.svg",
+    widthCm: 31,
+    heightCm: 44.5,
+    canRotate: true,
+  },
+  {
+    id: "pouch-xxxlarge",
+    name: "XXL",
+    imageUrl: "/images/XXL.svg",
+    widthCm: 33,
+    heightCm: 44.5,
     canRotate: true,
   },
 ];
@@ -193,6 +227,142 @@ export const useBagStore = create<BagState>((set, get) => ({
           largePlacement,
           smallPlacement
         ]
+      }));
+    }
+  },
+
+  addPackingCubeMedium: () => {
+    const { products, bag, placements, mode } = get();
+    if (!bag) return;
+
+    const mProduct = products.find((p) => p.id === "pouch-medium");
+    const lProduct = products.find((p) => p.id === "pouch-xlarge");
+    if (!mProduct || !lProduct) return;
+
+    const mInstanceId = `pouch-medium-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const lInstanceId = `pouch-xlarge-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    const newInstances = [
+      { id: mInstanceId, pocketId: "pouch-medium" },
+      { id: lInstanceId, pocketId: "pouch-xlarge" },
+    ];
+
+    set((state) => ({
+      pocketInstances: [...state.pocketInstances, ...newInstances],
+    }));
+
+    if (mode === "auto") {
+      get().runAutoArrange();
+    } else {
+      // Manual mode: place sequentially without overwriting intermediate state
+      const currentPlacements = [...placements];
+
+      const mPlacementResult = findValidPlacement(
+        mProduct.widthCm,
+        mProduct.heightCm,
+        currentPlacements,
+        bag,
+      );
+      const mPlacement = {
+        id: mInstanceId,
+        xCm: mPlacementResult.xCm,
+        yCm: mPlacementResult.yCm,
+        widthCm: mProduct.widthCm,
+        heightCm: mProduct.heightCm,
+        rotation: 0 as const,
+        fitted: mPlacementResult.fitted,
+      };
+
+      if (mPlacement.fitted) {
+        currentPlacements.push(mPlacement);
+      }
+
+      const lPlacementResult = findValidPlacement(
+        lProduct.widthCm,
+        lProduct.heightCm,
+        currentPlacements,
+        bag,
+      );
+      const lPlacement = {
+        id: lInstanceId,
+        xCm: lPlacementResult.xCm,
+        yCm: lPlacementResult.yCm,
+        widthCm: lProduct.widthCm,
+        heightCm: lProduct.heightCm,
+        rotation: 0 as const,
+        fitted: lPlacementResult.fitted,
+      };
+
+      set((state) => ({
+        placements: [...state.placements, mPlacement, lPlacement],
+      }));
+    }
+  },
+
+  addPackingCubeLarge: () => {
+    const { products, bag, placements, mode } = get();
+    if (!bag) return;
+
+    const xlProduct = products.find((p) => p.id === "pouch-xxlarge");
+    const xxlProduct = products.find((p) => p.id === "pouch-xxxlarge");
+    if (!xlProduct || !xxlProduct) return;
+
+    const xlInstanceId = `pouch-xxlarge-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const xxlInstanceId = `pouch-xxxlarge-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    const newInstances = [
+      { id: xlInstanceId, pocketId: "pouch-xxlarge" },
+      { id: xxlInstanceId, pocketId: "pouch-xxxlarge" },
+    ];
+
+    set((state) => ({
+      pocketInstances: [...state.pocketInstances, ...newInstances],
+    }));
+
+    if (mode === "auto") {
+      get().runAutoArrange();
+    } else {
+      // Manual mode: place sequentially without overwriting intermediate state
+      const currentPlacements = [...placements];
+
+      const xlPlacementResult = findValidPlacement(
+        xlProduct.widthCm,
+        xlProduct.heightCm,
+        currentPlacements,
+        bag,
+      );
+      const xlPlacement = {
+        id: xlInstanceId,
+        xCm: xlPlacementResult.xCm,
+        yCm: xlPlacementResult.yCm,
+        widthCm: xlProduct.widthCm,
+        heightCm: xlProduct.heightCm,
+        rotation: 0 as const,
+        fitted: xlPlacementResult.fitted,
+      };
+
+      if (xlPlacement.fitted) {
+        currentPlacements.push(xlPlacement);
+      }
+
+      const xxlPlacementResult = findValidPlacement(
+        xxlProduct.widthCm,
+        xxlProduct.heightCm,
+        currentPlacements,
+        bag,
+      );
+      const xxlPlacement = {
+        id: xxlInstanceId,
+        xCm: xxlPlacementResult.xCm,
+        yCm: xxlPlacementResult.yCm,
+        widthCm: xxlProduct.widthCm,
+        heightCm: xxlProduct.heightCm,
+        rotation: 0 as const,
+        fitted: xxlPlacementResult.fitted,
+      };
+
+      set((state) => ({
+        placements: [...state.placements, xlPlacement, xxlPlacement],
       }));
     }
   },
