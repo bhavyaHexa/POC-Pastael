@@ -200,16 +200,4 @@ export const styles = {
     fontWeight: 600,
     textDecoration: "underline",
   } as React.CSSProperties,
-
-  footer: {
-    padding: "16px 40px",
-    background: "rgba(10, 11, 18, 0.9)",
-    borderTop: "1px solid rgba(255, 255, 255, 0.06)",
-    zIndex: 10,
-  } as React.CSSProperties,
-
-  footerContent: {
-    width: "100%",
-    margin: "0 auto",
-  } as React.CSSProperties,
 };

@@ -86,6 +86,9 @@ function App() {
               <div style={styles.canvasWrapper}>
                 <BagCanvas />
               </div>
+              <div style={{ marginTop: "16px", borderTop: "1px solid rgba(255, 255, 255, 0.08)", paddingTop: "12px" }}>
+                <Toolbar />
+              </div>
             </section>
 
             {/* Right Side: Product Selection & Summary */}
@@ -112,6 +115,9 @@ function App() {
               <div style={styles.canvasWrapper}>
                 <BagCanvas />
               </div>
+              <div style={{ marginTop: "16px", borderTop: "1px solid rgba(255, 255, 255, 0.08)", paddingTop: "12px" }}>
+                <Toolbar />
+              </div>
             </section>
 
             {/* Right Side: Product Selection, Summary, and Diagnostics CTA */}
@@ -126,13 +132,6 @@ function App() {
           </div>
         )}
       </div>
-
-      {/* Toolbar / Control Strip at bottom */}
-      <footer style={styles.footer}>
-        <div style={styles.footerContent}>
-          <Toolbar />
-        </div>
-      </footer>
     </div>
   );
 }

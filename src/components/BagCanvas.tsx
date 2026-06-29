@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Canvas,
   FabricImage,
@@ -154,6 +154,27 @@ export const BagCanvas: React.FC = () => {
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const fabricCanvasRef = useRef<Canvas | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  // Keep track of container dimensions to scale canvas dynamically
+  const [dimensions, setDimensions] = useState({ width: 800, height: 500 });
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const observer = new ResizeObserver((entries) => {
+      if (!entries || entries.length === 0) return;
+      const { width, height } = entries[0].contentRect;
+      // Subtract safety margins for card borders and layout gaps
+      setDimensions({
+        width: Math.max(width - 24, 300),
+        height: Math.max(height - 24, 200),
+      });
+    });
+
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
 
   // Use a ref to access the latest state in Fabric.js event handlers without stale closures
   const stateRef = useRef({
@@ -430,7 +451,16 @@ export const BagCanvas: React.FC = () => {
     const currentHeight = cmToPx(bag.heightCm);
     const stagingWidth = cmToPx(bag.widthCm + 35);
 
-    canvas.setDimensions({ width: stagingWidth, height: currentHeight });
+    // Calculate zoom factor to fit the canvas backing dimensions within the container dimensions
+    const zoomX = dimensions.width / stagingWidth;
+    const zoomY = dimensions.height / currentHeight;
+    const zoom = Math.min(zoomX, zoomY, 1.25); // Cap zoom at 1.25 to prevent excessive upscaling
+
+    canvas.setDimensions({
+      width: stagingWidth * zoom,
+      height: currentHeight * zoom,
+    });
+    canvas.setZoom(zoom);
 
     // Clear existing background image object if it exists
     const existingBg = canvas
@@ -518,7 +548,7 @@ export const BagCanvas: React.FC = () => {
     });
 
     canvas.renderAll();
-  }, [bag]);
+  }, [bag, dimensions]);
 
   // Effect 3: Synchronize placements layer (all pouches)
   useEffect(() => {
@@ -675,21 +705,27 @@ export const BagCanvas: React.FC = () => {
 
   return (
     <div
+      ref={containerRef}
       style={{
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
+        justifyContent: "center",
         userSelect: "none",
+        flex: 1,
+        minHeight: 0,
+        width: "100%",
+        height: "100%",
       }}
     >
-      <h3 style={{ margin: "0 0 10px 0" }}>Interactive Fabric.js Layout</h3>
       <div
         style={{
-          border: "1px solid #ccc",
-          borderRadius: "8px",
-          overflow: "hidden",
-          background: "#f0f0f0",
+          border: "1px solid rgba(255, 255, 255, 0.08)",
+          borderRadius: "12px",
+          background: "rgba(255, 255, 255, 0.02)",
           padding: "10px",
+          boxShadow: "0 4px 20px rgba(0, 0, 0, 0.2)",
+          display: "inline-block",
         }}
       >
         <canvas ref={canvasRef} />
