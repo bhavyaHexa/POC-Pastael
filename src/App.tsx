@@ -48,9 +48,7 @@ function App() {
     };
   }, []);
 
-  const navigateTo = (path: string) => {
-    window.history.pushState({}, "", path);
-  };
+
 
   const isDebug = currentPath.includes("debug");
 
@@ -65,30 +63,6 @@ function App() {
             <span style={styles.appSubtitle}>POC Bag Packing System</span>
           </div>
         </div>
-
-        {/* Route Selector Tabs */}
-        <nav style={styles.navContainer}>
-          <button
-            onClick={() => navigateTo("/")}
-            style={{
-              ...styles.navButtonBase,
-              background: !isDebug ? "rgba(99, 102, 241, 0.2)" : "transparent",
-              color: !isDebug ? "#a5b4fc" : "#94a3b8",
-            }}
-          >
-            <span>📦</span> Configurator
-          </button>
-          <button
-            onClick={() => navigateTo("/debug")}
-            style={{
-              ...styles.navButtonBase,
-              background: isDebug ? "rgba(99, 102, 241, 0.2)" : "transparent",
-              color: isDebug ? "#a5b4fc" : "#94a3b8",
-            }}
-          >
-            <span>🛠️</span> Visual Debugger
-          </button>
-        </nav>
       </header>
 
       {/* Main Content Area */}
