@@ -3,11 +3,13 @@ import { useBagStore } from "../store/bagStore";
 
 export const ProductList: React.FC = () => {
   const {
+    bags,
+    bag,
+    setBag,
     products,
     pocketInstances,
     placements,
     removeProductInstance,
-    bag,
     addPackingCube,
     addPackingCubeMedium,
     addPackingCubeLarge,
@@ -15,6 +17,40 @@ export const ProductList: React.FC = () => {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      {/* Suitcase Changer Section */}
+      <h3 style={{ margin: "0 0 10px 0", color: "#f8f9fa", fontSize: "1.1rem", fontWeight: 600 }}>Select Suitcase</h3>
+      <div
+        style={{
+          display: "flex",
+          gap: "8px",
+          marginBottom: "24px",
+          flexWrap: "wrap",
+        }}
+      >
+        {bags.map((b) => {
+          const isActive = bag?.id === b.id;
+          return (
+            <button
+              key={b.id}
+              onClick={() => setBag(b.id)}
+              style={{
+                padding: "8px 14px",
+                border: isActive ? "2px solid #6366f1" : "1px solid rgba(255, 255, 255, 0.12)",
+                background: isActive ? "rgba(99, 102, 241, 0.15)" : "rgba(255, 255, 255, 0.02)",
+                color: isActive ? "#a5b4fc" : "#cbd5e1",
+                borderRadius: "8px",
+                cursor: "pointer",
+                fontWeight: 600,
+                fontSize: "0.85rem",
+                transition: "all 0.2s ease",
+              }}
+            >
+              {b.name} ({b.widthCm}×{b.heightCm}×{b.depthCm} cm)
+            </button>
+          );
+        })}
+      </div>
+
       <h3 style={{ margin: "0 0 15px 0" }}>Product Selection</h3>
 
       {/* Available Pockets buttons */}
