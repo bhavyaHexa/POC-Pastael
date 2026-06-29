@@ -14,7 +14,7 @@ import { isInside } from "../utils/geometry";
 
 interface CustomFabricObject extends FabricObject {
   data?: {
-    type: "pouch" | "packingArea" | "bagBackground";
+    type: "pouch" | "packingArea" | "bagBackground" | "boundaryLine";
     id?: string;
     productId?: string;
   };
@@ -265,6 +265,8 @@ export const BagCanvas: React.FC = () => {
 
     return {
       isValid: insideBin && !overlaps,
+      insideBin,
+      overlaps,
       xCm: proposedRect.x,
       yCm: proposedRect.y,
       rotation: snappedRotation,
@@ -280,9 +282,9 @@ export const BagCanvas: React.FC = () => {
     if (!initialBag) return;
 
     const canvas = new Canvas(canvasRef.current, {
-      width: cmToPx(initialBag.widthCm),
+      width: cmToPx(initialBag.widthCm + 35),
       height: cmToPx(initialBag.heightCm),
-      backgroundColor: "#f0f0f0",
+      backgroundColor: "#f5f5f5",
       selection: initialMode === "manual",
       enableRetinaScaling: false,
     });
@@ -294,8 +296,11 @@ export const BagCanvas: React.FC = () => {
       const obj = e.target;
       if (!obj || (obj as CustomFabricObject).data?.type !== "pouch") return;
 
-      const { isValid } = validatePlacement(obj);
-      const color = isValid ? "#4CAF50" : "#f44336";
+      const { insideBin, overlaps } = validatePlacement(obj);
+      let color = "#007af5"; // Blue for staging / outside the bag
+      if (insideBin) {
+        color = overlaps ? "#f44336" : "#4CAF50"; // Red for overlap, Green for valid fit inside bag
+      }
       obj.borderColor = color;
       obj.cornerColor = color;
       canvas.requestRenderAll();
@@ -305,8 +310,11 @@ export const BagCanvas: React.FC = () => {
       const obj = e.target;
       if (!obj || (obj as CustomFabricObject).data?.type !== "pouch") return;
 
-      const { isValid } = validatePlacement(obj);
-      const color = isValid ? "#4CAF50" : "#f44336";
+      const { insideBin, overlaps } = validatePlacement(obj);
+      let color = "#007af5";
+      if (insideBin) {
+        color = overlaps ? "#f44336" : "#4CAF50";
+      }
       obj.borderColor = color;
       obj.cornerColor = color;
       canvas.requestRenderAll();
@@ -317,13 +325,13 @@ export const BagCanvas: React.FC = () => {
       const objData = obj ? (obj as CustomFabricObject).data : null;
       if (!obj || objData?.type !== "pouch" || !objData.id) return;
 
-      const { isValid, xCm, yCm, rotation } = validatePlacement(obj);
+      const { insideBin, overlaps, xCm, yCm, rotation } = validatePlacement(obj);
       const { placements: currentPlacements, updatePlacement: performUpdate } =
         stateRef.current;
 
       const placement = currentPlacements.find((p) => p.id === objData.id);
 
-      if (isValid && placement) {
+      if (placement) {
         const instance = stateRef.current.pocketInstances.find(
           (i) => i.id === objData.id,
         );
@@ -331,38 +339,54 @@ export const BagCanvas: React.FC = () => {
           ? stateRef.current.products.find((p) => p.id === instance.pocketId)
           : null;
 
-        const newWidthCm =
-          rotation === 90 ? product!.heightCm : product!.widthCm;
-        const newHeightCm =
-          rotation === 90 ? product!.widthCm : product!.heightCm;
+        if (product) {
+          const newWidthCm =
+            rotation === 90 ? product.heightCm : product.widthCm;
+          const newHeightCm =
+            rotation === 90 ? product.widthCm : product.heightCm;
 
-        performUpdate(objData.id, {
-          xCm,
-          yCm,
-          rotation: rotation as 0 | 90,
-          widthCm: newWidthCm,
-          heightCm: newHeightCm,
-        });
+          if (insideBin && !overlaps) {
+            // Dropped inside a compartment, no overlap -> Fitted inside the bag
+            performUpdate(objData.id, {
+              xCm,
+              yCm,
+              rotation: rotation as 0 | 90,
+              widthCm: newWidthCm,
+              heightCm: newHeightCm,
+              fitted: true,
+            });
+            obj.borderColor = "#007af5";
+            obj.cornerColor = "#007af5";
+          } else if (!insideBin) {
+            // Dropped outside the compartments -> Unfitted, but allowed to stay outside the bag
+            performUpdate(objData.id, {
+              xCm,
+              yCm,
+              rotation: rotation as 0 | 90,
+              widthCm: newWidthCm,
+              heightCm: newHeightCm,
+              fitted: false,
+            });
+            obj.borderColor = "#007af5";
+            obj.cornerColor = "#007af5";
+          } else {
+            // Dropped inside a compartment but overlaps -> Revert position
+            const cx = cmToPx(placement.xCm) + cmToPx(placement.widthCm) / 2;
+            const cy = cmToPx(placement.yCm) + cmToPx(placement.heightCm) / 2;
 
-        // Reset outline selection style to blue
-        obj.borderColor = "#007af5";
-        obj.cornerColor = "#007af5";
-      } else if (placement) {
-        // Revert to store position
-        const cx = cmToPx(placement.xCm) + cmToPx(placement.widthCm) / 2;
-        const cy = cmToPx(placement.yCm) + cmToPx(placement.heightCm) / 2;
+            obj.set({
+              left: cx,
+              top: cy,
+              angle: placement.rotation,
+            });
+            obj.setCoords();
 
-        obj.set({
-          left: cx,
-          top: cy,
-          angle: placement.rotation,
-        });
-        obj.setCoords();
+            obj.borderColor = "#007af5";
+            obj.cornerColor = "#007af5";
 
-        obj.borderColor = "#007af5";
-        obj.cornerColor = "#007af5";
-
-        console.log("Invalid placement: Reverted pouch position.");
+            console.log("Invalid placement (overlaps inside compartment): Reverted pouch position.");
+          }
+        }
       }
 
       canvas.requestRenderAll();
@@ -404,8 +428,9 @@ export const BagCanvas: React.FC = () => {
 
     const currentWidth = cmToPx(bag.widthCm);
     const currentHeight = cmToPx(bag.heightCm);
+    const stagingWidth = cmToPx(bag.widthCm + 35);
 
-    canvas.setDimensions({ width: currentWidth, height: currentHeight });
+    canvas.setDimensions({ width: stagingWidth, height: currentHeight });
 
     // Clear existing background image object if it exists
     const existingBg = canvas
@@ -416,6 +441,27 @@ export const BagCanvas: React.FC = () => {
     if (existingBg) {
       canvas.remove(existingBg);
     }
+
+    // Clear existing boundary lines
+    const existingBoundaries = canvas
+      .getObjects()
+      .filter(
+        (obj) => (obj as CustomFabricObject).data?.type === "boundaryLine",
+      );
+    existingBoundaries.forEach((obj) => canvas.remove(obj));
+
+    // Draw vertical boundary line between suitcase and staging area
+    const borderLine = new Rect({
+      left: currentWidth,
+      top: 0,
+      width: 2,
+      height: currentHeight,
+      fill: "#cccccc",
+      selectable: false,
+      evented: false,
+      data: { type: "boundaryLine" },
+    });
+    canvas.add(borderLine);
 
     // Load background image as a standard non-selectable canvas object starting at top-left
     FabricImage.fromURL(bag.imageUrl)
@@ -474,15 +520,14 @@ export const BagCanvas: React.FC = () => {
     canvas.renderAll();
   }, [bag]);
 
-  // Effect 3: Synchronize placements layer (fitted pouches)
+  // Effect 3: Synchronize placements layer (all pouches)
   useEffect(() => {
     const canvas = fabricCanvasRef.current;
     if (!canvas || !bag) return;
 
     canvas.selection = mode === "manual";
 
-    const fittedPlacements = placements.filter((p) => p.fitted);
-    const placementIds = fittedPlacements.map((p) => p.id);
+    const placementIds = placements.map((p) => p.id);
 
     // Remove pouch objects no longer in the placements list
     const existingPouches = canvas
@@ -496,7 +541,7 @@ export const BagCanvas: React.FC = () => {
     });
 
     // Update coordinates or add new ones
-    fittedPlacements.forEach((pl) => {
+    placements.forEach((pl) => {
       const existingObj = existingPouches.find(
         (obj) => (obj as CustomFabricObject).data?.id === pl.id,
       );
@@ -614,6 +659,15 @@ export const BagCanvas: React.FC = () => {
       );
     if (bgImg) {
       canvas.moveObjectTo(bgImg, 0);
+    }
+
+    const bLine = canvas
+      .getObjects()
+      .find(
+        (obj) => (obj as CustomFabricObject).data?.type === "boundaryLine",
+      );
+    if (bLine) {
+      canvas.moveObjectTo(bLine, 1);
     }
 
     canvas.renderAll();

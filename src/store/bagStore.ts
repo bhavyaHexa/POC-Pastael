@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { MaxRectsPacker } from "maxrects-packer";
 import type { BagTemplate, Pocket, Placement } from "../types";
 import { findValidPlacement } from "../utils/placement";
+import { BagConfigManager } from "../models/BagModels";
 
 export interface BagState {
   bags: BagTemplate[];
@@ -28,81 +29,64 @@ export interface BagState {
   addPackingCubeLarge: () => void;
 }
 
-// Initial mock data based on the design document
-const DEFAULT_BAGS: BagTemplate[] = [
-  {
-    id: "bag-default",
-    name: "Suitcase",
-    imageUrl: "/images/SuitCase.svg",
-    widthCm: 80,
-    heightCm: 55,
-    packingAreasCm: [
-      {
-        x: 3.5,
-        y: 4.0,
-        width: 33.0,
-        height: 47.0,
-      },
-      {
-        x: 41,
-        y: 4.0,
-        width: 33.0,
-        height: 47.0,
-      },
-    ],
-  },
-];
+const configManager = BagConfigManager.getInstance();
+const DEFAULT_BAGS = configManager.getBags();
+const DEFAULT_PRODUCTS = configManager.getProducts();
 
-const DEFAULT_PRODUCTS: Pocket[] = [
-  {
-    id: "pouch-large",
-    name: "S",
-    imageUrl: "/images/S.svg",
-    widthCm: 20.9,
-    heightCm: 26.0,
-    canRotate: true,
-  },
-  {
-    id: "pouch-small",
-    name: "XS",
-    imageUrl: "/images/XS.svg",
-    widthCm: 10.9,
-    heightCm: 24.9,
-    canRotate: true,
-  },
-  {
-    id: "pouch-medium",
-    name: "M",
-    imageUrl: "/images/M.svg",
-    widthCm: 18,
-    heightCm: 33,
-    canRotate: true,
-  },
-  {
-    id: "pouch-xlarge",
-    name: "L",
-    imageUrl: "/images/L.svg",
-    widthCm: 24.9,
-    heightCm: 33,
-    canRotate: true,
-  },
-  {
-    id: "pouch-xxlarge",
-    name: "XL",
-    imageUrl: "/images/XL.svg",
-    widthCm: 31,
-    heightCm: 44.5,
-    canRotate: true,
-  },
-  {
-    id: "pouch-xxxlarge",
-    name: "XXL",
-    imageUrl: "/images/XXL.svg",
-    widthCm: 33,
-    heightCm: 44.5,
-    canRotate: true,
-  },
-];
+const getManualPlacement = (
+  product: Pocket,
+  bag: BagTemplate,
+  currentPlacements: Placement[]
+): Placement => {
+  const placementResult = findValidPlacement(
+    product.widthCm,
+    product.heightCm,
+    currentPlacements,
+    bag
+  );
+
+  if (placementResult.fitted) {
+    return {
+      id: "", // will be filled by caller
+      xCm: placementResult.xCm,
+      yCm: placementResult.yCm,
+      widthCm: product.widthCm,
+      heightCm: product.heightCm,
+      rotation: 0,
+      fitted: true,
+    };
+  } else {
+    // Position it in the staging area
+    const unfittedPlacements = currentPlacements.filter((p) => !p.fitted);
+    let currentX = bag.widthCm + 2;
+    let currentY = 2;
+    let colWidth = 0;
+
+    for (const pl of unfittedPlacements) {
+      if (pl.xCm >= currentX) {
+        if (pl.yCm + pl.heightCm > currentY) {
+          currentY = pl.yCm + pl.heightCm + 2;
+        }
+        colWidth = Math.max(colWidth, pl.widthCm);
+      }
+      if (currentY + product.heightCm > bag.heightCm - 2) {
+        currentX += Math.max(colWidth, 15) + 2;
+        currentY = 2;
+        colWidth = 0;
+      }
+    }
+
+    return {
+      id: "",
+      xCm: Number(currentX.toFixed(2)),
+      yCm: Number(currentY.toFixed(2)),
+      widthCm: product.widthCm,
+      heightCm: product.heightCm,
+      rotation: 0,
+      fitted: false,
+    };
+  }
+};
 
 export const useBagStore = create<BagState>((set, get) => ({
   bags: DEFAULT_BAGS,
@@ -135,26 +119,10 @@ export const useBagStore = create<BagState>((set, get) => ({
     if (mode === "auto") {
       get().runAutoArrange();
     } else {
-      // Manual mode: find a valid non-overlapping location without resetting other placements
-      const placementResult = findValidPlacement(
-        product.widthCm,
-        product.heightCm,
-        placements,
-        bag,
-      );
+      const placement = getManualPlacement(product, bag, placements);
+      placement.id = instanceId;
       set((state) => ({
-        placements: [
-          ...state.placements,
-          {
-            id: instanceId,
-            xCm: placementResult.xCm,
-            yCm: placementResult.yCm,
-            widthCm: product.widthCm,
-            heightCm: product.heightCm,
-            rotation: 0,
-            fitted: placementResult.fitted,
-          },
-        ],
+        placements: [...state.placements, placement],
       }));
     }
   },
@@ -182,51 +150,17 @@ export const useBagStore = create<BagState>((set, get) => ({
     if (mode === 'auto') {
       get().runAutoArrange();
     } else {
-      // Manual mode: place sequentially without overwriting intermediate state
       const currentPlacements = [...placements];
 
-      const largePlacementResult = findValidPlacement(
-        largeProduct.widthCm,
-        largeProduct.heightCm,
-        currentPlacements,
-        bag
-      );
-      const largePlacement = {
-        id: largeInstanceId,
-        xCm: largePlacementResult.xCm,
-        yCm: largePlacementResult.yCm,
-        widthCm: largeProduct.widthCm,
-        heightCm: largeProduct.heightCm,
-        rotation: 0 as const,
-        fitted: largePlacementResult.fitted
-      };
+      const largePlacement = getManualPlacement(largeProduct, bag, currentPlacements);
+      largePlacement.id = largeInstanceId;
+      currentPlacements.push(largePlacement);
 
-      if (largePlacement.fitted) {
-        currentPlacements.push(largePlacement);
-      }
-
-      const smallPlacementResult = findValidPlacement(
-        smallProduct.widthCm,
-        smallProduct.heightCm,
-        currentPlacements,
-        bag
-      );
-      const smallPlacement = {
-        id: smallInstanceId,
-        xCm: smallPlacementResult.xCm,
-        yCm: smallPlacementResult.yCm,
-        widthCm: smallProduct.widthCm,
-        heightCm: smallProduct.heightCm,
-        rotation: 0 as const,
-        fitted: smallPlacementResult.fitted
-      };
+      const smallPlacement = getManualPlacement(smallProduct, bag, currentPlacements);
+      smallPlacement.id = smallInstanceId;
 
       set((state) => ({
-        placements: [
-          ...state.placements,
-          largePlacement,
-          smallPlacement
-        ]
+        placements: [...state.placements, largePlacement, smallPlacement],
       }));
     }
   },
@@ -254,44 +188,14 @@ export const useBagStore = create<BagState>((set, get) => ({
     if (mode === "auto") {
       get().runAutoArrange();
     } else {
-      // Manual mode: place sequentially without overwriting intermediate state
       const currentPlacements = [...placements];
 
-      const mPlacementResult = findValidPlacement(
-        mProduct.widthCm,
-        mProduct.heightCm,
-        currentPlacements,
-        bag,
-      );
-      const mPlacement = {
-        id: mInstanceId,
-        xCm: mPlacementResult.xCm,
-        yCm: mPlacementResult.yCm,
-        widthCm: mProduct.widthCm,
-        heightCm: mProduct.heightCm,
-        rotation: 0 as const,
-        fitted: mPlacementResult.fitted,
-      };
+      const mPlacement = getManualPlacement(mProduct, bag, currentPlacements);
+      mPlacement.id = mInstanceId;
+      currentPlacements.push(mPlacement);
 
-      if (mPlacement.fitted) {
-        currentPlacements.push(mPlacement);
-      }
-
-      const lPlacementResult = findValidPlacement(
-        lProduct.widthCm,
-        lProduct.heightCm,
-        currentPlacements,
-        bag,
-      );
-      const lPlacement = {
-        id: lInstanceId,
-        xCm: lPlacementResult.xCm,
-        yCm: lPlacementResult.yCm,
-        widthCm: lProduct.widthCm,
-        heightCm: lProduct.heightCm,
-        rotation: 0 as const,
-        fitted: lPlacementResult.fitted,
-      };
+      const lPlacement = getManualPlacement(lProduct, bag, currentPlacements);
+      lPlacement.id = lInstanceId;
 
       set((state) => ({
         placements: [...state.placements, mPlacement, lPlacement],
@@ -322,44 +226,14 @@ export const useBagStore = create<BagState>((set, get) => ({
     if (mode === "auto") {
       get().runAutoArrange();
     } else {
-      // Manual mode: place sequentially without overwriting intermediate state
       const currentPlacements = [...placements];
 
-      const xlPlacementResult = findValidPlacement(
-        xlProduct.widthCm,
-        xlProduct.heightCm,
-        currentPlacements,
-        bag,
-      );
-      const xlPlacement = {
-        id: xlInstanceId,
-        xCm: xlPlacementResult.xCm,
-        yCm: xlPlacementResult.yCm,
-        widthCm: xlProduct.widthCm,
-        heightCm: xlProduct.heightCm,
-        rotation: 0 as const,
-        fitted: xlPlacementResult.fitted,
-      };
+      const xlPlacement = getManualPlacement(xlProduct, bag, currentPlacements);
+      xlPlacement.id = xlInstanceId;
+      currentPlacements.push(xlPlacement);
 
-      if (xlPlacement.fitted) {
-        currentPlacements.push(xlPlacement);
-      }
-
-      const xxlPlacementResult = findValidPlacement(
-        xxlProduct.widthCm,
-        xxlProduct.heightCm,
-        currentPlacements,
-        bag,
-      );
-      const xxlPlacement = {
-        id: xxlInstanceId,
-        xCm: xxlPlacementResult.xCm,
-        yCm: xxlPlacementResult.yCm,
-        widthCm: xxlProduct.widthCm,
-        heightCm: xxlProduct.heightCm,
-        rotation: 0 as const,
-        fitted: xxlPlacementResult.fitted,
-      };
+      const xxlPlacement = getManualPlacement(xxlProduct, bag, currentPlacements);
+      xxlPlacement.id = xxlInstanceId;
 
       set((state) => ({
         placements: [...state.placements, xlPlacement, xxlPlacement],
@@ -525,18 +399,36 @@ export const useBagStore = create<BagState>((set, get) => ({
       );
     }
 
-    // 3. Mark items that didn't fit in either compartment
+    // 3. Mark items that didn't fit in either compartment and arrange them in the staging area
+    let stagingX = bag.widthCm + 2;
+    let stagingY = 2;
+    let stagingColWidth = 0;
+
     const unfittedPlacements: Placement[] = finalRemainingInstances.map((instance) => {
       const product = products.find((p) => p.id === instance.pocketId)!;
-      return {
+      const width = product.widthCm;
+      const height = product.heightCm;
+
+      if (stagingY + height > bag.heightCm - 2 && stagingY > 2) {
+        stagingX += stagingColWidth + 2;
+        stagingY = 2;
+        stagingColWidth = 0;
+      }
+
+      const placement = {
         id: instance.id,
-        xCm: 0,
-        yCm: 0,
-        widthCm: product.widthCm,
-        heightCm: product.heightCm,
-        rotation: 0,
+        xCm: Number(stagingX.toFixed(2)),
+        yCm: Number(stagingY.toFixed(2)),
+        widthCm: width,
+        heightCm: height,
+        rotation: 0 as const,
         fitted: false,
       };
+
+      stagingColWidth = Math.max(stagingColWidth, width);
+      stagingY += height + 2;
+
+      return placement;
     });
 
     // Combine all placements and set in state

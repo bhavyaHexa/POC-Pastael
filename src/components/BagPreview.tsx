@@ -84,7 +84,7 @@ export const BagPreview: React.FC = () => {
 
       {/* Bag Name */}
       <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '1.1em', color: 'inherit' }}>
-        {bag.name} ({bag.widthCm} × {bag.heightCm} cm / {bagWidthPx} × {bagHeightPx} px)
+        {bag.name} ({bag.widthCm} × {bag.heightCm} × {bag.depthCm} cm / {bagWidthPx} × {bagHeightPx} px)
       </div>
 
       {/* Total Dimensions Card */}
@@ -101,7 +101,7 @@ export const BagPreview: React.FC = () => {
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
           <span style={{ color: '#555' }}>Centimeters:</span>
-          <strong>{bag.widthCm} × {bag.heightCm} cm</strong>
+          <strong>{bag.widthCm} × {bag.heightCm} × {bag.depthCm} cm</strong>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
           <span style={{ color: '#555' }}>Pixels:</span>

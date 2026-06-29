@@ -11,5 +11,6 @@ export interface BagTemplate {
   imageUrl: string;
   widthCm: number;
   heightCm: number;
+  depthCm: number;
   packingAreasCm: PackingArea[];
 }

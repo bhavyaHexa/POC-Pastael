@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import {
   BagCanvas,
   ProductList,
@@ -5,90 +6,158 @@ import {
   Summary,
   BagPreview,
 } from "./components";
+import { styles } from "./styles/appStyles";
 import "./App.css";
 
 function App() {
+  const [currentPath, setCurrentPath] = useState(window.location.pathname);
+
+  useEffect(() => {
+    const handleLocationChange = () => {
+      setCurrentPath(window.location.pathname);
+    };
+
+    window.addEventListener("popstate", handleLocationChange);
+
+    // Patch pushState and replaceState to trigger re-renders on route changes
+    const originalPushState = window.history.pushState;
+    const originalReplaceState = window.history.replaceState;
+
+    window.history.pushState = function (
+      data: any,
+      unused: string,
+      url?: string | URL | null,
+    ) {
+      originalPushState.call(this, data, unused, url);
+      handleLocationChange();
+    };
+
+    window.history.replaceState = function (
+      data: any,
+      unused: string,
+      url?: string | URL | null,
+    ) {
+      originalReplaceState.call(this, data, unused, url);
+      handleLocationChange();
+    };
+
+    return () => {
+      window.removeEventListener("popstate", handleLocationChange);
+      window.history.pushState = originalPushState;
+      window.history.replaceState = originalReplaceState;
+    };
+  }, []);
+
+  const navigateTo = (path: string) => {
+    window.history.pushState({}, "", path);
+  };
+
+  const isDebug = currentPath.includes("debug");
+
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        height: "100vh",
-        padding: "20px",
-        boxSizing: "border-box",
-        fontFamily: "Inter, sans-serif",
-      }}
-    >
-      <header style={{ marginBottom: "20px" }}>
-        <h1 style={{ margin: 0 }}>Bag Packing Configurator POC</h1>
+    <div style={styles.appContainer}>
+      {/* Top Header / Navigation Bar */}
+      <header style={styles.header}>
+        <div style={styles.logoContainer}>
+          <div style={styles.logoBox}>P</div>
+          <div>
+            <h1 style={styles.appName}>Pastael Configurator</h1>
+            <span style={styles.appSubtitle}>POC Bag Packing System</span>
+          </div>
+        </div>
+
+        {/* Route Selector Tabs */}
+        <nav style={styles.navContainer}>
+          <button
+            onClick={() => navigateTo("/")}
+            style={{
+              ...styles.navButtonBase,
+              background: !isDebug ? "rgba(99, 102, 241, 0.2)" : "transparent",
+              color: !isDebug ? "#a5b4fc" : "#94a3b8",
+            }}
+          >
+            <span>📦</span> Configurator
+          </button>
+          <button
+            onClick={() => navigateTo("/debug")}
+            style={{
+              ...styles.navButtonBase,
+              background: isDebug ? "rgba(99, 102, 241, 0.2)" : "transparent",
+              color: isDebug ? "#a5b4fc" : "#94a3b8",
+            }}
+          >
+            <span>🛠️</span> Visual Debugger
+          </button>
+        </nav>
       </header>
 
-      <main style={{ display: "flex", flex: 1, gap: "20px", minHeight: 0 }}>
-        {/* Left Side: Bag Preview */}
-        <section
-          style={{
-            flex: "1 1 25%",
-            border: "1px solid #ddd",
-            padding: "15px",
-            borderRadius: "8px",
-            display: "flex",
-            flexDirection: "column",
-            overflowY: "auto",
-          }}
-        >
-          <BagPreview />
-        </section>
+      {/* Main Content Area */}
+      <div style={styles.mainContentArea}>
+        {isDebug ? (
+          /* Debug View: Full 3-column display */
+          <div style={styles.layoutGrid}>
+            {/* Left Side: Bag Preview & Diagnostics */}
+            <section style={styles.debugPreviewSection}>
+              <BagPreview />
+            </section>
 
-        {/* Center: Interactive SVG Layout */}
-        <section
-          style={{
-            flex: "1 1 50%",
-            border: "1px solid #ddd",
-            padding: "15px",
-            borderRadius: "8px",
-            display: "flex",
-            flexDirection: "column",
-          }}
-        >
-          <BagCanvas />
-        </section>
+            {/* Center: Interactive SVG/Fabric.js Canvas */}
+            <section style={styles.canvasSectionBase}>
+              <div style={styles.canvasHeaderRow}>
+                <h3 style={styles.canvasTitle}>Interactive Layout</h3>
+                <span style={styles.canvasSubtitle}>
+                  Drag & drop items to edit placement
+                </span>
+              </div>
+              <div style={styles.canvasWrapper}>
+                <BagCanvas />
+              </div>
+            </section>
 
-        {/* Right Side: Product Selection & Summary */}
-        <section
-          style={{
-            flex: "1 1 25%",
-            display: "flex",
-            flexDirection: "column",
-            gap: "20px",
-          }}
-        >
-          <div
-            style={{
-              flex: 1,
-              border: "1px solid #ddd",
-              padding: "15px",
-              borderRadius: "8px",
-              display: "flex",
-              flexDirection: "column",
-            }}
-          >
-            <ProductList />
+            {/* Right Side: Product Selection & Summary */}
+            <section style={styles.rightSectionBase}>
+              <div style={styles.productListCard}>
+                <ProductList />
+              </div>
+              <div style={styles.summaryCard}>
+                <Summary />
+              </div>
+            </section>
           </div>
-          <div
-            style={{
-              border: "1px solid #ddd",
-              padding: "15px",
-              borderRadius: "8px",
-            }}
-          >
-            <Summary />
-          </div>
-        </section>
-      </main>
+        ) : (
+          /* Main Configurator View: 2-column layout containing visual canvas and selection/summary panels */
+          <div style={styles.layoutGrid}>
+            {/* Left/Center: Visual suitcase canvas preview */}
+            <section style={{ ...styles.canvasSectionBase, flex: "1 1 70%" }}>
+              <div style={styles.canvasHeaderRow}>
+                <h3 style={styles.canvasTitle}>Interactive Layout</h3>
+                <span style={styles.canvasSubtitle}>
+                  See how packing cubes fit in your bag
+                </span>
+              </div>
+              <div style={styles.canvasWrapper}>
+                <BagCanvas />
+              </div>
+            </section>
 
-      {/* Bottom: Toolbar */}
-      <footer style={{ marginTop: "20px" }}>
-        <Toolbar />
+            {/* Right Side: Product Selection, Summary, and Diagnostics CTA */}
+            <section style={{ ...styles.rightSectionBase, flex: "1 1 30%" }}>
+              <div style={styles.productListCard}>
+                <ProductList />
+              </div>
+              <div style={styles.summaryCard}>
+                <Summary />
+              </div>
+            </section>
+          </div>
+        )}
+      </div>
+
+      {/* Toolbar / Control Strip at bottom */}
+      <footer style={styles.footer}>
+        <div style={styles.footerContent}>
+          <Toolbar />
+        </div>
       </footer>
     </div>
   );

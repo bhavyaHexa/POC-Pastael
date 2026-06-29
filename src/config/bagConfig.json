@@ -1,0 +1,98 @@
+{
+  "bags": [
+    {
+      "id": "bag-default",
+      "name": "Small(XS)",
+      "imageUrl": "/images/SuitCase.svg",
+      "widthCm": 80,
+      "heightCm": 55,
+      "depthCm": 20,
+      "packingAreasCm": [
+        {
+          "x": 3.5,
+          "y": 4.0,
+          "width": 33.0,
+          "height": 47.0
+        },
+        {
+          "x": 41,
+          "y": 4.0,
+          "width": 33.0,
+          "height": 47.0
+        }
+      ]
+    },
+    {
+      "id": "bag-Cabin",
+      "name": "Cabin(S)",
+      "imageUrl": "/images/Cabin(S).svg",
+      "widthCm": 80,
+      "heightCm": 60,
+      "depthCm": 20,
+      "packingAreasCm": [
+        {
+          "x": 3.5,
+          "y": 4.0,
+          "width": 33.0,
+          "height": 47.0
+        },
+        {
+          "x": 41,
+          "y": 4.0,
+          "width": 33.0,
+          "height": 47.0
+        }
+      ]
+    }
+  ],
+  "products": [
+    {
+      "id": "pouch-large",
+      "name": "S",
+      "imageUrl": "/images/S.svg",
+      "widthCm": 20.9,
+      "heightCm": 26.0,
+      "canRotate": true
+    },
+    {
+      "id": "pouch-small",
+      "name": "XS",
+      "imageUrl": "/images/XS.svg",
+      "widthCm": 10.9,
+      "heightCm": 24.9,
+      "canRotate": true
+    },
+    {
+      "id": "pouch-medium",
+      "name": "M",
+      "imageUrl": "/images/M.svg",
+      "widthCm": 18,
+      "heightCm": 33,
+      "canRotate": true
+    },
+    {
+      "id": "pouch-xlarge",
+      "name": "L",
+      "imageUrl": "/images/L.svg",
+      "widthCm": 24.9,
+      "heightCm": 33,
+      "canRotate": true
+    },
+    {
+      "id": "pouch-xxlarge",
+      "name": "XL",
+      "imageUrl": "/images/XL.svg",
+      "widthCm": 31,
+      "heightCm": 44.5,
+      "canRotate": true
+    },
+    {
+      "id": "pouch-xxxlarge",
+      "name": "XXL",
+      "imageUrl": "/images/XXL.svg",
+      "widthCm": 33,
+      "heightCm": 44.5,
+      "canRotate": true
+    }
+  ]
+}
