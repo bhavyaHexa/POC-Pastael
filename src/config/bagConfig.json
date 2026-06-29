@@ -9,16 +9,16 @@
       "depthCm": 20,
       "packingAreasCm": [
         {
-          "x": 3.5,
-          "y": 4.0,
-          "width": 33.0,
-          "height": 47.0
+          "x": 3.0,
+          "y": 3.0,
+          "width": 34.0,
+          "height": 49.0
         },
         {
-          "x": 41,
-          "y": 4.0,
-          "width": 33.0,
-          "height": 47.0
+          "x": 40.5,
+          "y": 3.0,
+          "width": 34.0,
+          "height": 49.0
         }
       ]
     },
@@ -31,16 +31,60 @@
       "depthCm": 20,
       "packingAreasCm": [
         {
-          "x": 3.5,
-          "y": 4.0,
-          "width": 33.0,
-          "height": 47.0
+          "x": 3.0,
+          "y": 3.0,
+          "width": 33.5,
+          "height": 53.0
         },
         {
-          "x": 41,
-          "y": 4.0,
-          "width": 33.0,
-          "height": 47.0
+          "x": 40.5,
+          "y": 3.0,
+          "width": 33.5,
+          "height": 53.0
+        }
+      ]
+    },
+    {
+      "id": "bag-Medium",
+      "name": "Medium(M)",
+      "imageUrl": "/images/Medium(M).svg",
+      "widthCm": 90,
+      "heightCm": 65,
+      "depthCm": 27,
+      "packingAreasCm": [
+        {
+          "x": 3.0,
+          "y": 3.0,
+          "width": 37.0,
+          "height": 58.0
+        },
+        {
+          "x": 46,
+          "y": 3.0,
+          "width": 37.0,
+          "height": 58.0
+        }
+      ]
+    },
+    {
+      "id": "bag-Large",
+      "name": "Large(L)",
+      "imageUrl": "/images/Large(L).svg",
+      "widthCm": 100,
+      "heightCm": 75,
+      "depthCm": 30,
+      "packingAreasCm": [
+        {
+          "x": 3.0,
+          "y": 3.5,
+          "width": 41.0,
+          "height": 67.0
+        },
+        {
+          "x": 50.5,
+          "y": 3.5,
+          "width": 41.0,
+          "height": 67.0
         }
       ]
     }
