@@ -447,6 +447,8 @@ export const BagCanvas: React.FC = () => {
     const canvas = fabricCanvasRef.current;
     if (!canvas || !bag) return;
 
+    let active = true;
+
     const currentWidth = cmToPx(bag.widthCm);
     const currentHeight = cmToPx(bag.heightCm);
     const stagingWidth = cmToPx(bag.widthCm + 35);
@@ -496,7 +498,17 @@ export const BagCanvas: React.FC = () => {
     // Load background image as a standard non-selectable canvas object starting at top-left
     FabricImage.fromURL(bag.imageUrl)
       .then((img) => {
-        if (!fabricCanvasRef.current) return;
+        if (!active || !fabricCanvasRef.current) return;
+
+        // Double check to remove any duplicate background object right before adding
+        const doubleCheckBg = canvas
+          .getObjects()
+          .find(
+            (obj) => (obj as CustomFabricObject).data?.type === "bagBackground",
+          );
+        if (doubleCheckBg) {
+          canvas.remove(doubleCheckBg);
+        }
 
         img.set({
           left: 0,
@@ -515,9 +527,11 @@ export const BagCanvas: React.FC = () => {
         canvas.sendObjectToBack(img);
         canvas.renderAll();
       })
-      .catch((err) =>
-        console.error("Error loading bag background image:", err),
-      );
+      .catch((err) => {
+        if (active) {
+          console.error("Error loading bag background image:", err);
+        }
+      });
 
     // Clear existing packing area rects
     const existingRects = canvas
@@ -548,12 +562,18 @@ export const BagCanvas: React.FC = () => {
     });
 
     canvas.renderAll();
+
+    return () => {
+      active = false;
+    };
   }, [bag, dimensions]);
 
   // Effect 3: Synchronize placements layer (all pouches)
   useEffect(() => {
     const canvas = fabricCanvasRef.current;
     if (!canvas || !bag) return;
+
+    let active = true;
 
     canvas.selection = mode === "manual";
 
@@ -622,7 +642,18 @@ export const BagCanvas: React.FC = () => {
         // Load the pouch image dynamically
         FabricImage.fromURL(product.imageUrl)
           .then((img) => {
-            if (!fabricCanvasRef.current) return;
+            if (!active || !fabricCanvasRef.current) return;
+
+            // Double check to make sure it doesn't already exist on canvas from a parallel resolution
+            const alreadyExists = canvas
+              .getObjects()
+              .some(
+                (o) =>
+                  (o as CustomFabricObject).data?.type === "pouch" &&
+                  (o as CustomFabricObject).data?.id === pl.id,
+              );
+            if (alreadyExists) return;
+
             const imgW = cmToPx(product.widthCm);
             const imgH = cmToPx(product.heightCm);
 
@@ -669,7 +700,11 @@ export const BagCanvas: React.FC = () => {
             canvas.add(img);
             canvas.renderAll();
           })
-          .catch((err) => console.error("Error loading pouch image:", err));
+          .catch((err) => {
+            if (active) {
+              console.error("Error loading pouch image:", err);
+            }
+          });
       }
     });
 
@@ -701,6 +736,10 @@ export const BagCanvas: React.FC = () => {
     }
 
     canvas.renderAll();
+
+    return () => {
+      active = false;
+    };
   }, [placements, mode, pocketInstances, products, bag]);
 
   return (
