@@ -17,6 +17,7 @@ interface CustomFabricObject extends FabricObject {
     type: "pouch" | "packingArea" | "bagBackground" | "boundaryLine";
     id?: string;
     productId?: string;
+    imageUrl?: string;
   };
 }
 
@@ -602,10 +603,21 @@ export const BagCanvas: React.FC = () => {
         : null;
       if (!product) return;
 
+      // Resolve image URL based on selected color variation
+      let imageUrl = product.imageUrl;
+      if (instance && instance.color && product.colors) {
+        const matchingColor = product.colors.find((c) => c.name === instance.color);
+        if (matchingColor) {
+          imageUrl = matchingColor.imageUrl;
+        }
+      }
+
       const cx = cmToPx(pl.xCm) + cmToPx(pl.widthCm) / 2;
       const cy = cmToPx(pl.yCm) + cmToPx(pl.heightCm) / 2;
 
-      if (existingObj) {
+      const currentObjImageUrl = (existingObj as CustomFabricObject)?.data?.imageUrl;
+
+      if (existingObj && currentObjImageUrl === imageUrl) {
         // If not actively being dragged/modified by the user, synchronize its coordinates
         if (canvas.getActiveObject() !== existingObj) {
           existingObj.set({
@@ -639,8 +651,13 @@ export const BagCanvas: React.FC = () => {
           existingObj.setCoords();
         }
       } else {
-        // Load the pouch image dynamically
-        FabricImage.fromURL(product.imageUrl)
+        // If it exists but has a different image, remove it first
+        if (existingObj) {
+          canvas.remove(existingObj);
+        }
+
+        // Load the pouch image dynamically using resolved imageUrl
+        FabricImage.fromURL(imageUrl)
           .then((img) => {
             if (!active || !fabricCanvasRef.current) return;
 
@@ -650,7 +667,8 @@ export const BagCanvas: React.FC = () => {
               .some(
                 (o) =>
                   (o as CustomFabricObject).data?.type === "pouch" &&
-                  (o as CustomFabricObject).data?.id === pl.id,
+                  (o as CustomFabricObject).data?.id === pl.id &&
+                  (o as CustomFabricObject).data?.imageUrl === imageUrl,
               );
             if (alreadyExists) return;
 
@@ -677,7 +695,7 @@ export const BagCanvas: React.FC = () => {
               selectable: mode === "manual",
               evented: mode === "manual",
               hoverCursor: mode === "manual" ? "move" : "default",
-              data: { type: "pouch", id: pl.id, productId: product.id },
+              data: { type: "pouch", id: pl.id, productId: product.id, imageUrl: imageUrl },
             });
 
             // Assign controls and override visibility

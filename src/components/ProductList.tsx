@@ -10,10 +10,23 @@ export const ProductList: React.FC = () => {
     pocketInstances,
     placements,
     removeProductInstance,
+    updatePocketInstanceColor,
     addPackingCube,
     addPackingCubeMedium,
     addPackingCubeLarge,
   } = useBagStore();
+
+  const resolveInstanceImageUrl = (instance: typeof pocketInstances[number], product: typeof products[number]) => {
+    if (instance.color && product.colors) {
+      const match = product.colors.find((c) => c.name === instance.color);
+      return match?.imageUrl ?? product.imageUrl;
+    }
+    return product.imageUrl;
+  };
+
+  const getInstanceColorOptions = (product: typeof products[number]) => {
+    return product.colors ?? [];
+  };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
@@ -138,6 +151,7 @@ export const ProductList: React.FC = () => {
             .map((instance) => {
               const product = products.find((p) => p.id === instance.pocketId)!;
               const placement = placements.find((pl) => pl.id === instance.id)!;
+              const colorOptions = getInstanceColorOptions(product);
 
               return (
                 <div
@@ -160,7 +174,7 @@ export const ProductList: React.FC = () => {
                     }}
                   >
                     <img
-                      src={product.imageUrl}
+                      src={resolveInstanceImageUrl(instance, product)}
                       alt={product.name}
                       style={{
                         width: "30px",
@@ -177,7 +191,7 @@ export const ProductList: React.FC = () => {
                           marginTop: "2px",
                           display: "flex",
                           flexDirection: "column",
-                          gap: "2px",
+                          gap: "6px",
                         }}
                       >
                         <div>
@@ -218,6 +232,46 @@ export const ProductList: React.FC = () => {
                             </>
                           );
                         })()}
+                        {colorOptions.length > 0 && (
+                          <div style={{ marginTop: "4px" }}>
+                            <label
+                              htmlFor={`color-${instance.id}`}
+                              style={{
+                                display: "block",
+                                fontSize: "0.8em",
+                                color: "#555",
+                                marginBottom: "4px",
+                              }}
+                            >
+                              Color:
+                            </label>
+                            <select
+                              id={`color-${instance.id}`}
+                              value={instance.color}
+                              onChange={(event) =>
+                                updatePocketInstanceColor(
+                                  instance.id,
+                                  event.target.value,
+                                )
+                              }
+                              style={{
+                                width: "100%",
+                                padding: "6px 8px",
+                                borderRadius: "6px",
+                                border: "1px solid #d1d5db",
+                                background: "#fff",
+                                color: "#111",
+                                fontSize: "0.85em",
+                              }}
+                            >
+                              {colorOptions.map((colorOption) => (
+                                <option key={colorOption.name} value={colorOption.name}>
+                                  {colorOption.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

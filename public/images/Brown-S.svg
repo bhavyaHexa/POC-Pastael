@@ -1,0 +1,69 @@
+import re
+
+# Let's create an SVG that mimics the uploaded image shape, structure, and stripes, but replacing the yellow with brown.
+# The image shows a rectangular pouch with rounded corners, a cream border/piping, and alternating horizontal stripes.
+# Yellow stripes -> Brown stripes.
+
+svg_content = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 800" width="100%" height="100%">
+  <defs>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-opacity="0.3"/>
+    </filter>
+    
+    <linearGradient id="volume-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#000000" stop-opacity="0.15"/>
+      <stop offset="4%" stop-color="#ffffff" stop-opacity="0.1"/>
+      <stop offset="15%" stop-color="#ffffff" stop-opacity="0.0"/>
+      <stop offset="85%" stop-color="#000000" stop-opacity="0.0"/>
+      <stop offset="96%" stop-color="#000000" stop-opacity="0.1"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.25"/>
+    </linearGradient>
+
+    <linearGradient id="vertical-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#000000" stop-opacity="0.1"/>
+      <stop offset="3%" stop-color="#ffffff" stop-opacity="0.05"/>
+      <stop offset="95%" stop-color="#000000" stop-opacity="0.0"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.15"/>
+    </linearGradient>
+    
+    <clipPath id="inner-pouch-clip">
+      <rect x="15" y="15" width="370" height="770" rx="35" ry="35" />
+    </clipPath>
+  </defs>
+
+  <rect width="100%" height="100%" fill="none"/>
+
+  <g filter="url(#shadow)">
+    <rect x="10" y="10" width="380" height="780" rx="40" ry="40" fill="#543124" stroke="#D7C5A9" stroke-width="2" />
+    <rect x="13" y="13" width="374" height="774" rx="37" ry="37" fill="#CBB39E" />
+
+    <g clip-path="url(#inner-pouch-clip)">
+      <rect x="15" y="15" width="370" height="770" fill="#F4EFE6" />
+
+      <rect x="15" y="65" width="370" height="48" fill="#543124" />
+      <rect x="15" y="161" width="370" height="48" fill="#543124" />
+      <rect x="15" y="257" width="370" height="48" fill="#543124" />
+      <rect x="15" y="353" width="370" height="48" fill="#543124" />
+      <rect x="15" y="449" width="370" height="48" fill="#543124" />
+      <rect x="15" y="545" width="370" height="48" fill="#543124" />
+      <rect x="15" y="641" width="370" height="48" fill="#543124" />
+      <rect x="15" y="737" width="370" height="48" fill="#543124" />
+      
+      <rect x="15" y="620" width="8" height="30" rx="2" fill="#CBB39E" opacity="0.7" />
+
+      <rect x="15" y="15" width="370" height="770" fill="url(#volume-grad)" />
+      <rect x="15" y="15" width="370" height="770" fill="url(#vertical-grad)" />
+      
+      <path d="M 15 45 Q 120 35 250 50 T 385 40" fill="none" stroke="#CBB39E" stroke-width="3" opacity="0.15" />
+      <path d="M 15 52 Q 130 45 240 58 T 385 48" fill="none" stroke="#CBB39E" stroke-width="2" opacity="0.08" />
+    </g>
+    
+    <rect x="15" y="15" width="370" height="770" rx="35" ry="35" fill="none" stroke="#CBB39E" stroke-width="1.5" opacity="0.4" />
+  </g>
+</svg>
+"""
+
+with open("striped_pouch_brown.svg", "w") as f:
+    f.write(svg_content)
+
+print("SVG created successfully.")

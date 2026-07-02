@@ -9,7 +9,7 @@ export interface BagState {
   bag: BagTemplate | null;
   products: Pocket[];
   // Selected pocket instances (can contain duplicates of the same pocket template)
-  pocketInstances: { id: string; pocketId: string }[];
+  pocketInstances: { id: string; pocketId: string; color?: string }[];
   // Current placement coordinates in cm
   placements: Placement[];
   mode: "auto" | "manual";
@@ -18,6 +18,7 @@ export interface BagState {
   // Actions
   setBag: (bagId: string) => void;
   addProductInstance: (pocketId: string) => void;
+  updatePocketInstanceColor: (instanceId: string, color: string) => void;
   removeProductInstance: (instanceId: string) => void;
   updatePlacement: (placementId: string, updates: Partial<Placement>) => void;
   setMode: (mode: "auto" | "manual") => void;
@@ -32,6 +33,9 @@ export interface BagState {
 const configManager = BagConfigManager.getInstance();
 const DEFAULT_BAGS = configManager.getBags();
 const DEFAULT_PRODUCTS = configManager.getProducts();
+
+const getDefaultColor = (product: Pocket): string | undefined =>
+  product.colors?.[0]?.name ?? product.color;
 
 const getManualPlacement = (
   product: Pocket,
@@ -110,7 +114,11 @@ export const useBagStore = create<BagState>((set, get) => ({
     if (!product || !bag) return;
 
     const instanceId = `${pocketId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const newInstance = { id: instanceId, pocketId };
+    const newInstance = {
+      id: instanceId,
+      pocketId,
+      color: getDefaultColor(product),
+    };
 
     set((state) => ({
       pocketInstances: [...state.pocketInstances, newInstance],
@@ -131,16 +139,24 @@ export const useBagStore = create<BagState>((set, get) => ({
     const { products, bag, placements, mode } = get();
     if (!bag) return;
 
-    const largeProduct = products.find(p => p.id === 'pouch-large');
-    const smallProduct = products.find(p => p.id === 'pouch-small');
+    const largeProduct = products.find(p => p.id === 'pouch-S');
+    const smallProduct = products.find(p => p.id === 'pouch-XS');
     if (!largeProduct || !smallProduct) return;
 
-    const largeInstanceId = `pouch-large-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const smallInstanceId = `pouch-small-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const largeInstanceId = `pouch-S-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const smallInstanceId = `pouch-XS-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
     const newInstances = [
-      { id: largeInstanceId, pocketId: 'pouch-large' },
-      { id: smallInstanceId, pocketId: 'pouch-small' }
+      {
+        id: largeInstanceId,
+        pocketId: 'pouch-S',
+        color: getDefaultColor(largeProduct),
+      },
+      {
+        id: smallInstanceId,
+        pocketId: 'pouch-XS',
+        color: getDefaultColor(smallProduct),
+      },
     ];
 
     set((state) => ({
@@ -169,16 +185,24 @@ export const useBagStore = create<BagState>((set, get) => ({
     const { products, bag, placements, mode } = get();
     if (!bag) return;
 
-    const mProduct = products.find((p) => p.id === "pouch-medium");
-    const lProduct = products.find((p) => p.id === "pouch-xlarge");
+    const mProduct = products.find((p) => p.id === "pouch-M");
+    const lProduct = products.find((p) => p.id === "pouch-L");
     if (!mProduct || !lProduct) return;
 
-    const mInstanceId = `pouch-medium-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const lInstanceId = `pouch-xlarge-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const mInstanceId = `pouch-M-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const lInstanceId = `pouch-L-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
     const newInstances = [
-      { id: mInstanceId, pocketId: "pouch-medium" },
-      { id: lInstanceId, pocketId: "pouch-xlarge" },
+      {
+        id: mInstanceId,
+        pocketId: "pouch-M",
+        color: getDefaultColor(mProduct),
+      },
+      {
+        id: lInstanceId,
+        pocketId: "pouch-L",
+        color: getDefaultColor(lProduct),
+      },
     ];
 
     set((state) => ({
@@ -207,16 +231,24 @@ export const useBagStore = create<BagState>((set, get) => ({
     const { products, bag, placements, mode } = get();
     if (!bag) return;
 
-    const xlProduct = products.find((p) => p.id === "pouch-xxlarge");
-    const xxlProduct = products.find((p) => p.id === "pouch-xxxlarge");
+    const xlProduct = products.find((p) => p.id === "pouch-XL");
+    const xxlProduct = products.find((p) => p.id === "pouch-XXL");
     if (!xlProduct || !xxlProduct) return;
 
-    const xlInstanceId = `pouch-xxlarge-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const xxlInstanceId = `pouch-xxxlarge-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const xlInstanceId = `pouch-XL-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const xxlInstanceId = `pouch-XXL-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
     const newInstances = [
-      { id: xlInstanceId, pocketId: "pouch-xxlarge" },
-      { id: xxlInstanceId, pocketId: "pouch-xxxlarge" },
+      {
+        id: xlInstanceId,
+        pocketId: "pouch-XL",
+        color: getDefaultColor(xlProduct),
+      },
+      {
+        id: xxlInstanceId,
+        pocketId: "pouch-XXL",
+        color: getDefaultColor(xxlProduct),
+      },
     ];
 
     set((state) => ({
@@ -239,6 +271,14 @@ export const useBagStore = create<BagState>((set, get) => ({
         placements: [...state.placements, xlPlacement, xxlPlacement],
       }));
     }
+  },
+
+  updatePocketInstanceColor: (instanceId, color) => {
+    set((state) => ({
+      pocketInstances: state.pocketInstances.map((inst) =>
+        inst.id === instanceId ? { ...inst, color } : inst
+      ),
+    }));
   },
 
   removeProductInstance: (instanceId) => {

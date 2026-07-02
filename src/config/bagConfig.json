@@ -91,23 +91,43 @@
   ],
   "products": [
     {
-      "id": "pouch-large",
-      "name": "S",
+      "id": "pouch-S",
+      "name": "Yellow-S",
       "imageUrl": "/images/S.svg",
       "widthCm": 20.9,
       "heightCm": 26.0,
-      "canRotate": true
+      "canRotate": true,
+      "colors": [
+        {
+          "name": "yellow",
+          "imageUrl": "/images/S.svg"
+        },
+        {
+          "name": "brown",
+          "imageUrl": "/images/Brown-S.svg"
+        }
+      ]
     },
     {
-      "id": "pouch-small",
+      "id": "pouch-XS",
       "name": "XS",
       "imageUrl": "/images/XS.svg",
       "widthCm": 10.9,
       "heightCm": 24.9,
-      "canRotate": true
+      "canRotate": true,
+      "colors": [
+        {
+          "name": "yellow",
+          "imageUrl": "/images/XS.svg"
+        },
+        {
+          "name": "brown",
+          "imageUrl": "/images/Brown-XS.svg"
+        }
+      ]
     },
     {
-      "id": "pouch-medium",
+      "id": "pouch-M",
       "name": "M",
       "imageUrl": "/images/M.svg",
       "widthCm": 18,
@@ -115,7 +135,7 @@
       "canRotate": true
     },
     {
-      "id": "pouch-xlarge",
+      "id": "pouch-L",
       "name": "L",
       "imageUrl": "/images/L.svg",
       "widthCm": 24.9,
@@ -123,7 +143,7 @@
       "canRotate": true
     },
     {
-      "id": "pouch-xxlarge",
+      "id": "pouch-XL",
       "name": "XL",
       "imageUrl": "/images/XL.svg",
       "widthCm": 31,
@@ -131,7 +151,7 @@
       "canRotate": true
     },
     {
-      "id": "pouch-xxxlarge",
+      "id": "pouch-XXL",
       "name": "XXL",
       "imageUrl": "/images/XXL.svg",
       "widthCm": 33,
